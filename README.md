@@ -131,6 +131,32 @@ This applies to all offensive stats, defensive stats, finishing rates, strike zo
 
 ---
 
+## Running Locally
+
+```bash
+git clone https://github.com/your-username/ufc-fight-predictor
+cd ufc-fight-predictor
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+**The Odds API key** — the app fetches real-time fight odds. Get a free key at [the-odds-api.com](https://the-odds-api.com) (500 requests/month on the free tier) and set it as an environment variable:
+
+```bash
+export ODDS_API_KEY=your_key_here        # macOS / Linux
+set ODDS_API_KEY=your_key_here           # Windows
+```
+
+Or create a `.env` file in the project root:
+
+```
+ODDS_API_KEY=your_key_here
+```
+
+Odds are optional — the model will still predict fights without them, but market comparison features will be unavailable.
+
+---
+
 ## Data Sources
 
 | Source | Description |

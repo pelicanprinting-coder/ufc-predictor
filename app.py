@@ -9,7 +9,10 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 # ── CONFIGURAÇÃO ──────────────────────────────────────────────────
-API_KEY = "97d30892355e2d15de1257c0aa526a50"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+API_KEY = os.getenv("ODDS_API_KEY", "")
 
 NOME_MAP = {
     "Paulo Henrique Costa": "Paulo Costa",

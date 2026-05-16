@@ -18,6 +18,8 @@ NOME_MAP = {
     "Paulo Henrique Costa": "Paulo Costa",
     "Junior dos Santos": "Junior Dos Santos",
     "Weili Zhang": "Zhang Weili",
+    "Timmy Cuamba": "Timothy Cuamba",
+    "Tommy Gantt": "Thomas Gantt",
 }
 
 def normalizar_nome(nome):
@@ -30,7 +32,21 @@ def load_data():
     with open("features_final.pkl", "rb") as f:
         features = pickle.load(f)
     lookup = pd.read_csv("fighter_lookup_final.csv")
-    return models, features, lookup
+
+    models_dec, models_o25 = None, None
+    features_dec, features_o25 = None, None
+    try:
+        with open("model_decision.pkl", "rb") as f:
+            models_dec = pickle.load(f)
+        with open("model_over25.pkl", "rb") as f:
+            models_o25 = pickle.load(f)
+        with open("features_method_v2.pkl", "rb") as f:
+            features_dec = pickle.load(f)
+        with open("features_method.pkl", "rb") as f:
+            features_o25 = pickle.load(f)
+    except:
+        pass
+    return models, features, lookup, models_dec, models_o25, features_dec, features_o25
 
 @st.cache_data(ttl=3600)
 def get_upcoming_odds():
@@ -101,7 +117,7 @@ def get_card_evento(url_evento):
     except:
         return []
 
-models, features, lookup = load_data()
+models, features, lookup, models_dec, models_o25, features_dec, features_o25 = load_data()
 fighter_names = sorted(lookup["name"].dropna().tolist())
 
 # ── FUNÇÕES ───────────────────────────────────────────────────────
@@ -176,14 +192,63 @@ def build_features(r, b, r_odds=None, b_odds=None):
 
     return pd.DataFrame([feats])[features].fillna(0)
 
-def prever(f1_name, f2_name, odds_f1=None, odds_f2=None):
+def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
+           r_ko_odds=None, r_sub_odds=None, r_dec_odds=None,
+           b_ko_odds=None, b_sub_odds=None, b_dec_odds=None,
+           no_of_rounds=3):
     r = get_fighter_row(f1_name)
     b = get_fighter_row(f2_name)
     if r is None or b is None:
         return None
     X = build_features(r, b, odds_f1, odds_f2)
     probs = np.array([m.predict_proba(X)[0][1] for m in models.values()])
-    return probs.mean(), 1 - probs.mean(), r, b
+    prob_winner = probs.mean()
+
+    # Previsões secundárias
+    prob_decision, prob_over25 = None, None
+
+    if models_dec and features_dec:
+        try:
+            # Adicionar features de método
+            X_dec = X.copy()
+            def op(o): return (1/float(o)) if o and float(o) > 1 else 0.5
+
+            extra = {
+                'r_ko_prob':  op(r_ko_odds),  'r_sub_prob': op(r_sub_odds),
+                'r_dec_prob': op(r_dec_odds),  'b_ko_prob':  op(b_ko_odds),
+                'b_sub_prob': op(b_sub_odds),  'b_dec_prob': op(b_dec_odds),
+                'no_of_rounds': no_of_rounds,
+            }
+            for col, val in extra.items():
+                X_dec[col] = val
+
+            # Adicionar historial de decisões do lookup
+            for col in ['R_win_by_Decision_Unanimous','R_win_by_Decision_Split',
+                        'R_win_by_Decision_Majority','R_win_by_KO/TKO','R_win_by_Submission',
+                        'B_win_by_Decision_Unanimous','B_win_by_Decision_Split',
+                        'B_win_by_Decision_Majority','B_win_by_KO/TKO','B_win_by_Submission']:
+                X_dec[col] = 0
+
+            X_dec_final = X_dec.reindex(columns=features_dec, fill_value=0).fillna(0)
+            probs_dec = np.array([m.predict_proba(X_dec_final)[0][1]
+                                  for m in models_dec.values()])
+            prob_decision = probs_dec.mean()
+        except:
+            pass
+
+    if models_o25 and features_o25:
+        try:
+            X_o25 = X.copy()
+            for col, val in extra.items():
+                X_o25[col] = val
+            X_o25_final = X_o25.reindex(columns=features_o25, fill_value=0).fillna(0)
+            probs_o25 = np.array([m.predict_proba(X_o25_final)[0][1]
+                                  for m in models_o25.values()])
+            prob_over25 = probs_o25.mean()
+        except:
+            pass
+
+    return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25
 
 def conviction_label(prob):
     if prob >= 0.80: return 0, "HIGH CONVICTION", "#D4AF37", "high"
@@ -789,12 +854,12 @@ with tab1:
                 if res is None:
                     res = prever(f2_ufc, f1_ufc, odds_f2, odds_f1)
                     if res is not None:
-                        p2, p1, _, _ = res
+                        p2, p1, _, _, _, _ = res
                     else:
                         sem_dados.append(f"{f1_ufc} vs {f2_ufc}")
                         continue
                 else:
-                    p1, p2, _, _ = res
+                    p1, p2, _, _, _, _ = res
 
                 prob_fav = max(p1, p2)
                 combates_proc.append({
@@ -831,7 +896,7 @@ with tab1:
                 st.markdown(f"""
                 <div style="background:var(--bg3); border:1px solid var(--border); border-radius:10px;
                      padding:12px 16px; margin-top:12px; color:var(--muted); font-size:0.85rem;">
-                  ⚠️ <strong style="color:var(--text);">{len(sem_dados)} fights without data suficientes</strong><br>
+                  ⚠️ <strong style="color:var(--text);">{len(sem_dados)} fights without sufficient data</strong><br>
                   {'  ·  '.join(sem_dados)}
                 </div>
                 """, unsafe_allow_html=True)
@@ -870,12 +935,19 @@ with tab2:
         else:
             odds_r = r_odds_input if r_odds_input > 1.0 else None
             odds_b = b_odds_input if b_odds_input > 1.0 else None
-            res = prever(red_name, blue_name, odds_r, odds_b)
+            res = prever(red_name, blue_name, odds_r, odds_b,
+                         r_ko_odds=r_ko_odds_in if r_ko_odds_in > 1.0 else None,
+                         r_sub_odds=r_sub_odds_in if r_sub_odds_in > 1.0 else None,
+                         r_dec_odds=r_dec_odds_in if r_dec_odds_in > 1.0 else None,
+                         b_ko_odds=b_ko_odds_in if b_ko_odds_in > 1.0 else None,
+                         b_sub_odds=b_sub_odds_in if b_sub_odds_in > 1.0 else None,
+                         b_dec_odds=b_dec_odds_in if b_dec_odds_in > 1.0 else None,
+                         no_of_rounds=rounds_in)
 
             if res is None:
                 st.error("❌ Insufficient data for one or both fighters.")
             else:
-                prob_r, prob_b, red, blue = res
+                prob_r, prob_b, red, blue, prob_decision, prob_over25 = res
                 winner  = red_name if prob_r > prob_b else blue_name
                 w_corner = "🔴" if prob_r > prob_b else "🔵"
                 em, lbl, color, level = conviction_label(max(prob_r, prob_b))
@@ -981,6 +1053,59 @@ with tab2:
                         """, unsafe_allow_html=True)
 
                 # Stats table
+                # Previsões secundárias
+                if prob_decision is not None or prob_over25 is not None:
+                    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+                    st.markdown("""
+                    <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.1rem;
+                         font-weight:800; letter-spacing:0.08em; text-transform:uppercase;
+                         color:var(--muted); margin-bottom:12px;">
+                      🎯 Secondary Markets
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    sec_cols = st.columns(2)
+                    if prob_decision is not None:
+                        with sec_cols[0]:
+                            dec_label = "LIKELY DECISION" if prob_decision > 0.5 else "LIKELY FINISH"
+                            dec_color = "#D4AF37" if prob_decision > 0.5 else "#e8253f"
+                            st.markdown(f"""
+                            <div style="background:var(--bg3); border:1px solid var(--border);
+                                 border-radius:10px; padding:16px; text-align:center;">
+                              <div style="font-size:0.75rem; color:var(--muted);
+                                   letter-spacing:2px; text-transform:uppercase;
+                                   margin-bottom:6px;">Goes to Decision</div>
+                              <div style="font-family:'Barlow Condensed',sans-serif;
+                                   font-size:2rem; font-weight:900;
+                                   color:{dec_color};">{prob_decision*100:.0f}%</div>
+                              <div style="font-size:0.75rem; color:{dec_color};
+                                   font-weight:700; letter-spacing:1px;
+                                   margin-top:4px;">{dec_label}</div>
+                              <div style="font-size:0.7rem; color:var(--muted);
+                                   margin-top:4px;">Model accuracy: 59.45%</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    if prob_over25 is not None:
+                        with sec_cols[1]:
+                            o25_label = "LIKELY OVER" if prob_over25 > 0.5 else "LIKELY UNDER"
+                            o25_color = "#22c55e" if prob_over25 > 0.5 else "#60a5fa"
+                            st.markdown(f"""
+                            <div style="background:var(--bg3); border:1px solid var(--border);
+                                 border-radius:10px; padding:16px; text-align:center;">
+                              <div style="font-size:0.75rem; color:var(--muted);
+                                   letter-spacing:2px; text-transform:uppercase;
+                                   margin-bottom:6px;">Over / Under 2.5 Rounds</div>
+                              <div style="font-family:'Barlow Condensed',sans-serif;
+                                   font-size:2rem; font-weight:900;
+                                   color:{o25_color};">{prob_over25*100:.0f}%</div>
+                              <div style="font-size:0.75rem; color:{o25_color};
+                                   font-weight:700; letter-spacing:1px;
+                                   margin-top:4px;">{o25_label}</div>
+                              <div style="font-size:0.7rem; color:var(--muted);
+                                   margin-top:4px;">Model accuracy: 62.43%</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
                 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
                 st.markdown("""
                 <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.1rem;

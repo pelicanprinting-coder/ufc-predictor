@@ -642,6 +642,20 @@ def render_fight_card(c):
     p1_w   = f"{p1_pct:.1f}%"
     p2_w   = f"{p2_pct:.1f}%"
 
+    # Warnings para title fights e 5 rounds
+    warnings = []
+    if c.get("title_bout"):
+        warnings.append('<span style="background:rgba(200,16,46,0.15); color:#e8253f; '
+                        'border:1px solid rgba(200,16,46,0.3); border-radius:4px; '
+                        'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+                        'letter-spacing:0.05em;">🏆 TITLE FIGHT — model less reliable (64%)</span>')
+    if c.get("rounds") == 5 and not c.get("title_bout"):
+        warnings.append('<span style="background:rgba(255,165,0,0.15); color:#ffa500; '
+                        'border:1px solid rgba(255,165,0,0.3); border-radius:4px; '
+                        'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+                        'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
+    warnings_html = " ".join(warnings)
+
     html = (
         f'<div class="fight-card {card_class}">'
         f'  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
@@ -789,6 +803,8 @@ with tab1:
                     "prob_fav": prob_fav,
                     "odds_f1": odds_f1, "odds_f2": odds_f2,
                     "ordem": conviction_order(prob_fav),
+                    "title_bout": False,
+                    "rounds": 3,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))

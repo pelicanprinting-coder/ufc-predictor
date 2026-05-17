@@ -32,8 +32,9 @@ except Exception as e:
 print("\n[2/4] A correr scraper UFCStats...")
 try:
     result = subprocess.run(
-        ["python", "scrape_ufc_stats-main/scrape_ufc_stats_unparsed_data.py"],
-        capture_output=True, text=True, timeout=1800  # 30 min max
+        ["python", "scrape_ufc_stats_unparsed_data.py"],
+        capture_output=True, text=True, timeout=1800,  # 30 min max
+        cwd=os.path.join(os.path.dirname(os.path.abspath(__file__)), "scrape_ufc_stats-main")
     )
     if result.returncode == 0:
         print("  ✅ Dados UFCStats actualizados")
@@ -286,11 +287,64 @@ try:
          "finish_rate","ko_rate","sub_rate","SApM","str_def","td_def"]
     ].rename(columns={"FIGHTER": "name"})
 
-    # Carregar lookup base do ufc-master
+    # Calcular wins/losses correctos a partir do UFCStats
+    df_res_dated2 = df_res_raw.copy()
+    df_events_raw["DATE_dt"] = pd.to_datetime(df_events_raw["DATE"], format="%B %d, %Y", errors="coerce")
+    df_res_dated2 = df_res_dated2.merge(df_events_raw[["EVENT","DATE_dt"]], on="EVENT", how="left")
+
+    rows_wl = []
+    for _, row in df_res_dated2.iterrows():
+        bout = str(row["BOUT"]).strip()
+        outcome = str(row["OUTCOME"]).strip()
+        date = row["DATE_dt"]
+        try:
+            f1, f2 = bout.split(" vs. ")
+            f1, f2 = f1.strip(), f2.strip()
+        except:
+            continue
+        rows_wl.append({"FIGHTER": f1, "DATE": date, "won": int(outcome == "W/L"),
+                        "ko_win": int(outcome == "W/L" and ("KO" in str(row.get("METHOD","")) or "TKO" in str(row.get("METHOD","")))),
+                        "sub_win": int(outcome == "W/L" and "Submission" in str(row.get("METHOD","")))})
+        rows_wl.append({"FIGHTER": f2, "DATE": date, "won": int(outcome == "L/W"),
+                        "ko_win": int(outcome == "L/W" and ("KO" in str(row.get("METHOD","")) or "TKO" in str(row.get("METHOD","")))),
+                        "sub_win": int(outcome == "L/W" and "Submission" in str(row.get("METHOD","")))})
+
+    df_wl = pd.DataFrame(rows_wl).sort_values(["FIGHTER","DATE"])
+
+    wl_rows = []
+    for fighter, grupo in df_wl.groupby("FIGHTER"):
+        grupo = grupo.sort_values("DATE").reset_index(drop=True)
+        wins   = grupo["won"].sum()
+        losses = len(grupo) - wins
+        # Win streak
+        streak = 0
+        for w in reversed(grupo["won"].tolist()):
+            if w == 1: streak += 1
+            else: break
+        lose_streak = 0
+        for w in reversed(grupo["won"].tolist()):
+            if w == 0: lose_streak += 1
+            else: break
+        longest = 0
+        cur = 0
+        for w in grupo["won"].tolist():
+            cur = cur + 1 if w == 1 else 0
+            longest = max(longest, cur)
+        wl_rows.append({
+            "name": fighter,
+            "wins": wins, "losses": losses,
+            "win_streak": streak, "lose_streak": lose_streak,
+            "longest_win_streak": longest,
+            "ko_wins": grupo["ko_win"].sum(),
+            "sub_wins": grupo["sub_win"].sum(),
+        })
+
+    df_wl_lookup = pd.DataFrame(wl_rows)
+
+    # Carregar lookup base do ufc-master (só para height, reach, age, rank, dias_inativo)
     df_ult["date"] = pd.to_datetime(df_ult["date"], errors="coerce")
     df_ult = df_ult[df_ult["Winner"].isin(["Red","Blue"])].copy()
 
-    # Features base do ufc-master
     def build_base_lookup(df):
         rows = []
         for fighter in set(df["R_fighter"].tolist() + df["B_fighter"].tolist()):
@@ -306,29 +360,25 @@ try:
             corner = last["corner"]
             p = corner + "_"
             row = {
-                "name":               fighter,
-                "wins":               last.get(f"{p}wins", np.nan),
-                "losses":             last.get(f"{p}losses", np.nan),
-                "win_streak":         last.get(f"{p}current_win_streak", np.nan),
-                "lose_streak":        last.get(f"{p}current_lose_streak", np.nan),
-                "longest_win_streak": last.get(f"{p}longest_win_streak", np.nan),
-                "total_rounds":       last.get(f"{p}total_rounds_fought", np.nan),
-                "title_bouts":        last.get(f"{p}total_title_bouts", np.nan),
-                "ko_wins":            last.get(f"{p}win_by_KO/TKO", np.nan),
-                "sub_wins":           last.get(f"{p}win_by_Submission", np.nan),
-                "height":             last.get(f"{p}Height_cms", np.nan),
-                "reach":              last.get(f"{p}Reach_cms", np.nan),
-                "age":                last.get(f"{p}age", np.nan),
-                "rank":               last.get(f"{p}match_weightclass_rank", np.nan),
-                "dias_inativo":       (pd.Timestamp.now() - last["date"]).days
-                                      if pd.notna(last["date"]) else np.nan,
+                "name":         fighter,
+                "height":       last.get(f"{p}Height_cms", np.nan),
+                "reach":        last.get(f"{p}Reach_cms", np.nan),
+                "age":          last.get(f"{p}age", np.nan),
+                "rank":         last.get(f"{p}match_weightclass_rank", np.nan),
+                "total_rounds": last.get(f"{p}total_rounds_fought", np.nan),
+                "title_bouts":  last.get(f"{p}total_title_bouts", np.nan),
+                "dias_inativo": (pd.Timestamp.now() - last["date"]).days
+                                if pd.notna(last["date"]) else np.nan,
             }
             rows.append(row)
         return pd.DataFrame(rows)
 
     print("  A construir lookup base...")
     lookup_base = build_base_lookup(df_ult)
-    lookup_final = lookup_base.merge(lookup_novo, on="name", how="left")
+
+    # Merge: base + wl_ufcstats + rolling
+    lookup_final = lookup_base.merge(df_wl_lookup, on="name", how="left")
+    lookup_final = lookup_final.merge(lookup_novo, on="name", how="left")
 
     # Guardar
     lookup_final.to_csv("fighter_lookup_final.csv", index=False)

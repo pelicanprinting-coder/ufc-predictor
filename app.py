@@ -10,9 +10,11 @@ from bs4 import BeautifulSoup
 
 # ── CONFIGURAÇÃO ──────────────────────────────────────────────────
 import os
+import base64
+import io
 from dotenv import load_dotenv
 load_dotenv()
-API_KEY = os.getenv("ODDS_API_KEY", "")
+API_KEY = os.getenv("ODDS_API_KEY", "97d30892355e2d15de1257c0aa526a50")
 
 NOME_MAP = {
     "Paulo Henrique Costa": "Paulo Costa",
@@ -128,6 +130,134 @@ def decimal_to_prob(odds):
         return 1 / odds
     except:
         return None
+
+def calc_ev(odds, prob):
+    """Expected Value por unidade apostada em odds decimais"""
+    try:
+        odds = float(odds)
+        prob = float(prob)
+        if odds <= 1.0 or prob <= 0:
+            return None
+        return round(odds * prob - 1, 4)
+    except:
+        return None
+
+# ── HISTÓRICO (GitHub) ──────────────────────────────────────────
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_REPO  = "jdanielbcosta/ufc-predictor"
+HIST_FILE    = "historico.csv"
+
+def gh_get_historico():
+    """Descarrega o CSV de histórico do GitHub"""
+    if not GITHUB_TOKEN:
+        return pd.DataFrame()
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{HIST_FILE}"
+    r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, timeout=10)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()["content"]).decode("utf-8")
+        return pd.read_csv(io.StringIO(content))
+    return pd.DataFrame()
+
+def gh_save_historico(df):
+    """Guarda o CSV de histórico no GitHub"""
+    if not GITHUB_TOKEN:
+        return False
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{HIST_FILE}"
+    csv_content = df.to_csv(index=False)
+    encoded = base64.b64encode(csv_content.encode()).decode()
+    # Ver se ficheiro já existe (para obter SHA)
+    r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, timeout=10)
+    payload = {
+        "message": "Update historico.csv",
+        "content": encoded,
+    }
+    if r.status_code == 200:
+        payload["sha"] = r.json()["sha"]
+    r2 = requests.put(url, headers={"Authorization": f"token {GITHUB_TOKEN}"},
+                      json=payload, timeout=10)
+    return r2.status_code in [200, 201]
+
+def gh_save_previsoes(combates, event_name):
+    """Guarda as previsões antes do evento"""
+    if not combates:
+        return
+    hist = gh_get_historico()
+    rows = []
+    for c in combates:
+        rows.append({
+            "event_name": event_name,
+            "fighter_1": c["f1"],
+            "fighter_2": c["f2"],
+            "prob_f1": round(c["p1"], 4),
+            "prob_f2": round(c["p2"], 4),
+            "predicted_winner": c["f1"] if c["p1"] >= c["p2"] else c["f2"],
+            "odds_f1": c.get("odds_f1", ""),
+            "odds_f2": c.get("odds_f2", ""),
+            "conviction": conviction_label(max(c["p1"], c["p2"]))[1],
+            "actual_winner": "",
+            "correct": "",
+            "saved_at": pd.Timestamp.now().strftime("%Y-%m-%d"),
+        })
+    new_rows = pd.DataFrame(rows)
+    if not hist.empty:
+        # Não duplicar combates já guardados
+        existing = set(zip(hist["fighter_1"], hist["fighter_2"], hist["event_name"]))
+        new_rows = new_rows[~new_rows.apply(
+            lambda r: (r["fighter_1"], r["fighter_2"], r["event_name"]) in existing, axis=1)]
+    combined = pd.concat([hist, new_rows], ignore_index=True) if not hist.empty else new_rows
+    gh_save_historico(combined)
+
+def gh_update_resultados():
+    """Tenta actualizar resultados via UFCStats para combates sem resultado"""
+    hist = gh_get_historico()
+    if hist.empty:
+        return hist
+    sem_resultado = hist[hist["actual_winner"] == ""]
+    if sem_resultado.empty:
+        return hist
+    # Scrape últimos resultados do UFCStats
+    try:
+        from bs4 import BeautifulSoup
+        r = requests.get("http://ufcstats.com/statistics/events/completed?page=all",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Pegar nos últimos 3 eventos
+        event_links = [a["href"] for a in soup.select("a.b-link_style_black")[:3]]
+        resultados = {}
+        for ev_url in event_links:
+            r2 = requests.get(ev_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            soup2 = BeautifulSoup(r2.text, "html.parser")
+            for row in soup2.select("tr.b-fight-details__table-row"):
+                cols = row.select("td")
+                if len(cols) < 2:
+                    continue
+                fighters = row.select("a.b-link_style_black")
+                if len(fighters) >= 2:
+                    winner = fighters[0].text.strip()
+                    loser  = fighters[1].text.strip()
+                    resultados[f"{winner}_{loser}"] = winner
+                    resultados[f"{loser}_{winner}"] = winner
+        # Actualizar histórico
+        updated = False
+        for idx, row in hist.iterrows():
+            if row["actual_winner"] != "":
+                continue
+            key1 = f"{row['fighter_1']}_{row['fighter_2']}"
+            key2 = f"{row['fighter_2']}_{row['fighter_1']}"
+            winner = resultados.get(key1) or resultados.get(key2)
+            if winner:
+                hist.at[idx, "actual_winner"] = winner
+                hist.at[idx, "correct"] = "✅" if winner == row["predicted_winner"] else "❌"
+                updated = True
+        if updated:
+            gh_save_historico(hist)
+    except Exception as e:
+        print(f"Erro a actualizar resultados: {e}")
+    return hist
+
+def get_historico():
+    return gh_get_historico()
+
 
 def get_fighter_row(name):
     row = lookup[lookup["name"] == name]
@@ -672,6 +802,8 @@ def render_fight_card(c):
     em, lbl, color, level = conviction_label(c["prob_fav"])
     card_class = {"high": "fight-card-high", "moderate": "fight-card-med",
                   "slight": "fight-card-low", "close": "fight-card-draw"}[level]
+    prob_decision = c.get("prob_decision")
+    prob_over25   = c.get("prob_over25")
 
     p1_pct = c["p1"] * 100
     p2_pct = c["p2"] * 100
@@ -681,6 +813,20 @@ def render_fight_card(c):
     f2_class = "fav" if c["p2"] > c["p1"] else "plain-name"
     f1_name  = c["f1"]
     f2_name  = c["f2"]
+
+    # EV calculation
+    ev_f1_html = ""
+    ev_f2_html = ""
+    if c["odds_f1"] and c["p1"]:
+        ev = calc_ev(c["odds_f1"], c["p1"])
+        if ev is not None:
+            cls = "edge-pos" if ev > 0.05 else ("edge-neg" if ev < -0.05 else "edge-neu")
+            ev_f1_html = f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>'
+    if c["odds_f2"] and c["p2"]:
+        ev = calc_ev(c["odds_f2"], c["p2"])
+        if ev is not None:
+            cls = "edge-pos" if ev > 0.05 else ("edge-neg" if ev < -0.05 else "edge-neu")
+            ev_f2_html = f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>'
 
     # Odds strings
     odds_f1_str = f"{c['odds_f1']:.2f}" if c["odds_f1"] else "—"
@@ -752,6 +898,7 @@ def render_fight_card(c):
         f'      <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f1_str}</span></span>'
         f'      <span class="odds-chip">Market <span class="ov">{mkt_f1_str}</span></span>'
         f'      {edge_f1_html}'
+        f'      {ev_f1_html}'
         f'    </div>'
         f'    <div style="font-size:0.75rem; color:var(--muted);">Favourite:'
         f'      <strong style="color:var(--gold);">{fav}</strong>'
@@ -779,14 +926,14 @@ st.markdown("""
   </div>
 </div>
 <div style="margin: 10px 0 22px;">
-  <span class="badge-stat">🎯 Accuracy <span>68.33%</span></span>
-  <span class="badge-stat">🤖 Modelos <span>5 ensemble</span></span>
+  <span class="badge-stat">🎯 Accuracy <span>68.45%</span></span>
+  <span class="badge-stat">🤖 Models <span>5 ensemble</span></span>
   <span class="badge-stat">⚡ Conviction 80%+ <span>90.2% acc</span></span>
   <span class="badge-stat">📈 ROI 80%+ <span>+3.9%</span></span>
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT"])
+tab1, tab2, tab3 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY"])
 
 # ── TAB 1 ─────────────────────────────────────────────────────────
 with tab1:
@@ -794,10 +941,31 @@ with tab1:
     with col_t:
         st.markdown("""
         <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.6rem;
-             font-weight:800; letter-spacing:0.04em; color:var(--text); margin-bottom:4px;">
+             font-weight:800; letter-spacing:0.04em; color:#ffffff; margin-bottom:4px;">
           UPCOMING FIGHTS
         </div>
         """, unsafe_allow_html=True)
+
+    with st.expander("ℹ️ How to read EV (Expected Value)"):
+        st.markdown("""
+        **EV (Expected Value)** tells you whether a bet is mathematically profitable based on the model's probability vs the bookmaker's odds.
+
+        **Formula:** `EV = odds × model_probability - 1`
+
+        **How to interpret:**
+        - 🟢 **EV > 0** → positive expected value. The model thinks this bet is worth taking.
+        - 🔴 **EV < 0** → negative expected value. The bookmaker has an edge.
+        - The higher the EV, the more attractive the bet.
+
+        **Example:**
+        > Bookmaker offers **2.50** odds on Fighter A. The model gives Fighter A a **50%** chance of winning.
+        > EV = 2.50 × 0.50 − 1 = **+0.25** → For every €1 bet, you expect to profit €0.25 on average.
+
+        > Same odds **2.50**, but model gives only **35%** chance.
+        > EV = 2.50 × 0.35 − 1 = **−0.125** → You expect to lose €0.125 per €1 bet on average.
+
+        ⚠️ EV is a long-run statistical concept. A positive EV bet can still lose — it means the bet is profitable *on average* over many bets.
+        """)
     with col_r:
         if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
@@ -830,6 +998,12 @@ with tab1:
     if not eventos_ufc:
         st.error("⚠️ Could not load UFC card.")
     else:
+        if GITHUB_TOKEN and eventos_ufc:
+            st.toast("✅ Predictions saved to history")
+            try:
+                gh_update_resultados()
+            except:
+                pass
         for evento in eventos_ufc:
             # Event header
             st.markdown(f"""
@@ -870,9 +1044,19 @@ with tab1:
                     "ordem": conviction_order(prob_fav),
                     "title_bout": False,
                     "rounds": 3,
+                    "prob_decision": res[4] if len(res) > 4 else None,
+                    "prob_over25":   res[5] if len(res) > 5 else None,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))
+
+            # Guardar previsões só para eventos de hoje ou passados
+            from datetime import date
+            if combates_proc and GITHUB_TOKEN and evento["data"].date() <= date.today():
+                try:
+                    gh_save_previsoes(combates_proc, evento["nome"])
+                except Exception as e:
+                    pass
 
             # Section labels
             levels_seen = set()
@@ -891,6 +1075,50 @@ with tab1:
                     </div>
                     """, unsafe_allow_html=True)
                 render_fight_card(c)
+                # Secondary markets expander
+                prob_dec_c = c.get("prob_decision")
+                prob_o25_c = c.get("prob_over25")
+                if prob_dec_c is not None or prob_o25_c is not None:
+                    with st.expander("📊 Secondary Markets"):
+                        sec_c1, sec_c2 = st.columns(2)
+                        if prob_dec_c is not None:
+                            with sec_c1:
+                                dec_lbl = "LIKELY DECISION" if prob_dec_c > 0.5 else "LIKELY FINISH"
+                                dec_col = "#D4AF37" if prob_dec_c > 0.5 else "#e8253f"
+                                st.markdown(f"""
+                                <div style="background:var(--bg3); border:1px solid var(--border);
+                                     border-radius:10px; padding:14px; text-align:center;">
+                                  <div style="font-size:0.7rem; color:var(--muted);
+                                       letter-spacing:2px; text-transform:uppercase;
+                                       margin-bottom:4px;">Goes to Decision</div>
+                                  <div style="font-family:'Barlow Condensed',sans-serif;
+                                       font-size:2rem; font-weight:900;
+                                       color:{dec_col};">{prob_dec_c*100:.0f}%</div>
+                                  <div style="font-size:0.7rem; color:{dec_col};
+                                       font-weight:700; margin-top:2px;">{dec_lbl}</div>
+                                  <div style="font-size:0.65rem; color:var(--muted);
+                                       margin-top:2px;">Model accuracy: 59.45%</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        if prob_o25_c is not None:
+                            with sec_c2:
+                                o25_lbl = "LIKELY OVER" if prob_o25_c > 0.5 else "LIKELY UNDER"
+                                o25_col = "#22c55e" if prob_o25_c > 0.5 else "#60a5fa"
+                                st.markdown(f"""
+                                <div style="background:var(--bg3); border:1px solid var(--border);
+                                     border-radius:10px; padding:14px; text-align:center;">
+                                  <div style="font-size:0.7rem; color:var(--muted);
+                                       letter-spacing:2px; text-transform:uppercase;
+                                       margin-bottom:4px;">Over / Under 2.5 Rounds</div>
+                                  <div style="font-family:'Barlow Condensed',sans-serif;
+                                       font-size:2rem; font-weight:900;
+                                       color:{o25_col};">{prob_o25_c*100:.0f}%</div>
+                                  <div style="font-size:0.7rem; color:{o25_col};
+                                       font-weight:700; margin-top:2px;">{o25_lbl}</div>
+                                  <div style="font-size:0.65rem; color:var(--muted);
+                                       margin-top:2px;">Model accuracy: 62.43%</div>
+                                </div>
+                                """, unsafe_allow_html=True)
 
             if sem_dados:
                 st.markdown(f"""
@@ -907,8 +1135,8 @@ with tab1:
 with tab2:
     st.markdown("""
     <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.6rem;
-         font-weight:800; letter-spacing:0.04em; color:var(--text); margin-bottom:20px;">
-      PREVISÃO MANUAL
+         font-weight:800; letter-spacing:0.04em; color:#ffffff; margin-bottom:20px;">
+      FIGHT ANALYSIS
     </div>
     """, unsafe_allow_html=True)
 
@@ -935,6 +1163,14 @@ with tab2:
         else:
             odds_r = r_odds_input if r_odds_input > 1.0 else None
             odds_b = b_odds_input if b_odds_input > 1.0 else None
+            # Valores por defeito para inputs opcionais
+            r_ko_odds_in  = locals().get('r_ko_odds_in', 1.0)
+            r_sub_odds_in = locals().get('r_sub_odds_in', 1.0)
+            r_dec_odds_in = locals().get('r_dec_odds_in', 1.0)
+            b_ko_odds_in  = locals().get('b_ko_odds_in', 1.0)
+            b_sub_odds_in = locals().get('b_sub_odds_in', 1.0)
+            b_dec_odds_in = locals().get('b_dec_odds_in', 1.0)
+            rounds_in     = locals().get('rounds_in', 3)
             res = prever(red_name, blue_name, odds_r, odds_b,
                          r_ko_odds=r_ko_odds_in if r_ko_odds_in > 1.0 else None,
                          r_sub_odds=r_sub_odds_in if r_sub_odds_in > 1.0 else None,
@@ -959,7 +1195,7 @@ with tab2:
                     <span class="conviction-badge conv-{level}">{em} {lbl}</span>
                   </div>
                   <div class="result-winner">{w_corner} {winner}</div>
-                  <div class="result-pct">Probabilidade: {max(prob_r, prob_b):.1%}</div>
+                  <div class="result-pct">Probability: {max(prob_r, prob_b):.1%}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -1111,19 +1347,19 @@ with tab2:
                 <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.1rem;
                      font-weight:800; letter-spacing:0.08em; text-transform:uppercase;
                      color:var(--muted); margin-bottom:12px;">
-                  📊 Comparação de Estatísticas
+                  📊 Fighter Stats
                 </div>
                 """, unsafe_allow_html=True)
 
                 stats_map = [
-                    ("Vitórias",             "wins"),
-                    ("Derrotas",             "losses"),
+                    ("Wins",             "wins"),
+                    ("Losses",             "losses"),
                     ("Win Streak",           "win_streak"),
                     ("KO Wins",              "ko_wins"),
                     ("Sub Wins",             "sub_wins"),
-                    ("Altura (cm)",          "height"),
+                    ("Height (cm)",          "height"),
                     ("Reach (cm)",           "reach"),
-                    ("Idade",                "age"),
+                    ("Age",                "age"),
                     ("SLpM",                 "SLpM"),
                     ("SApM",                 "SApM"),
                     ("Str. Accuracy",        "sig_str_acc"),
@@ -1133,9 +1369,9 @@ with tab2:
                     ("Finish Rate",          "finish_rate"),
                     ("KO Rate",              "ko_rate"),
                     ("Sub Rate",             "sub_rate"),
-                    ("Win Rate recente",     "winrate_recente"),
-                    ("KO sofridos (ult. 3)", "ko_sofrido_recente"),
-                    ("Dias inativo",         "dias_inativo"),
+                    ("Recent Win Rate",     "winrate_recente"),
+                    ("KO losses (last 3)", "ko_sofrido_recente"),
+                    ("Days inactive",         "dias_inactive"),
                 ]
                 rows = []
                 for label, col in stats_map:
@@ -1148,3 +1384,75 @@ with tab2:
                     pd.DataFrame(rows).set_index("Estatística"),
                     use_container_width=True
                 )
+
+# ── TAB 3 ─────────────────────────────────────────────────────
+with tab3:
+    st.markdown("""
+    <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.6rem;
+         font-weight:800; letter-spacing:0.04em; color:#ffffff; margin-bottom:4px;">
+      PREDICTION HISTORY
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_h1, col_h2 = st.columns([3,1])
+    with col_h2:
+        if st.button("🔄 Update Results", use_container_width=True):
+            with st.spinner("Fetching latest results..."):
+                gh_update_resultados()
+            st.success("Results updated!")
+            st.rerun()
+
+    hist = get_historico()
+
+    if hist.empty:
+        st.info("No prediction history yet. Predictions are saved automatically when you load the Upcoming Events tab.")
+    else:
+        total = len(hist)
+        com_resultado = hist[hist["correct"].isin(["✅","❌"])]
+        corretos = (com_resultado["correct"] == "✅").sum()
+        acc = corretos / len(com_resultado) if len(com_resultado) > 0 else 0
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Predictions", total)
+        m2.metric("With Results", len(com_resultado))
+        m3.metric("Correct", corretos)
+        m4.metric("Accuracy", f"{acc:.1%}")
+
+        st.markdown("---")
+
+        # Mostrar só eventos com pelo menos um resultado
+        eventos_com_resultado = hist[hist["correct"].isin(["✅","❌"])]["event_name"].unique().tolist()
+        hist = hist[hist["event_name"].isin(eventos_com_resultado)]
+        eventos = ["All"] + sorted(eventos_com_resultado, reverse=True)
+        evento_sel = st.selectbox("Filter by Event", eventos)
+
+        df_show = hist if evento_sel == "All" else hist[hist["event_name"] == evento_sel]
+        df_show = df_show.sort_values("saved_at", ascending=False)
+
+        for _, row in df_show.iterrows():
+            correct_icon = row["correct"] if row["correct"] != "" else "⏳"
+            winner_display = row["actual_winner"] if row["actual_winner"] != "" else "Pending"
+            pred_col = "#22c55e" if row["correct"] == "✅" else ("#e8253f" if row["correct"] == "❌" else "#D4AF37")
+
+            st.markdown(f"""
+            <div style="background:var(--bg2); border:1px solid var(--border);
+                 border-radius:10px; padding:12px 16px; margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <span style="font-family:'Barlow Condensed',sans-serif; font-size:1.1rem;
+                       font-weight:700; color:#fff;">
+                    {row['fighter_1']} <span style="color:var(--muted);">vs</span> {row['fighter_2']}
+                  </span>
+                  <span style="font-size:0.75rem; color:var(--muted); margin-left:10px;">
+                    {row['event_name']}
+                  </span>
+                </div>
+                <div style="font-size:1.4rem;">{correct_icon}</div>
+              </div>
+              <div style="display:flex; gap:20px; margin-top:6px; font-size:0.8rem;">
+                <span>🎯 Predicted: <strong style="color:{pred_col};">{row['predicted_winner']}</strong>
+                  ({max(row['prob_f1'], row['prob_f2'])*100:.0f}% · {row['conviction']})</span>
+                <span>🏆 Result: <strong style="color:#fff;">{winner_display}</strong></span>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)

@@ -1,1 +1,2 @@
 event_name,fighter_1,fighter_2,prob_f1,prob_f2,predicted_winner,odds_f1,odds_f2,conviction,actual_winner,correct,saved_at
+TEST EVENT,Fighter A,Fighter B,0.65,0.35,Fighter A,1.8,2.1,SLIGHT,,,2026-05-17

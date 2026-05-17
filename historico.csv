@@ -1,2 +1,11 @@
 event_name,fighter_1,fighter_2,prob_f1,prob_f2,predicted_winner,odds_f1,odds_f2,conviction,actual_winner,correct,saved_at
 TEST EVENT,Fighter A,Fighter B,0.65,0.35,Fighter A,1.8,2.1,SLIGHT,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Song Yadong,Deiveson Figueiredo,0.7729,0.2271,Song Yadong,1.21,4.1,MODERATE CONVICTION,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Kai Asakura,Cameron Smotherman,0.7461,0.2539,Kai Asakura,1.28,3.5,SLIGHT FAVOURITE,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Zhang Mingyang,Alonzo Menifield,0.6512,0.3488,Zhang Mingyang,1.45,2.75,SLIGHT FAVOURITE,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Aoriqileng,Cody Haddon,0.5478,0.4522,Aoriqileng,,,TOO CLOSE TO CALL,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Sergei Pavlovich,Tallison Teixeira,0.5419,0.4581,Sergei Pavlovich,,,TOO CLOSE TO CALL,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Alex Perez,Sumudaerji,0.5391,0.4609,Alex Perez,,,TOO CLOSE TO CALL,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Loma Lookboonmee,Jaqueline Amorim,0.4685,0.5315,Jaqueline Amorim,2.05,1.74,TOO CLOSE TO CALL,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Muslim Salikhov,Jake Matthews,0.5251,0.4749,Muslim Salikhov,1.815,1.885,TOO CLOSE TO CALL,,,2026-05-17
+UFC Fight Night: Song vs. Figueiredo,Rei Tsuruya,Jesus Aguilar,0.4995,0.5005,Jesus Aguilar,,,TOO CLOSE TO CALL,,,2026-05-17

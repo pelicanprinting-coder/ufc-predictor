@@ -863,58 +863,23 @@ def inject_css():
 # ── HELPERS DE RENDER ─────────────────────────────────────────────
 @st.cache_data(ttl=86400)
 def get_fighter_photo(name):
-    """Busca foto do lutador na ufc.com e detecta direcção"""
+    """Busca foto do lutador na ufc.com"""
     try:
         slug = name.lower().replace(' ', '-')
         url = f"https://www.ufc.com/athlete/{slug}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
         if r.status_code != 200:
-            return None, False
+            return None
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(r.text, 'html.parser')
         img = soup.find('img', class_='hero-profile__image')
         if not img:
-            return None, False
-        src = img.get('src')
-
-        # Detectar direcção: analisar centro de massa horizontal da imagem
-        facing_right = detect_facing_direction(src)
-        return src, facing_right
+            return None
+        return img.get('src')
     except:
-        return None, False
+        return None
 
-def detect_facing_direction(img_url):
-    """Detecta se o lutador está virado para a direita.
-    Analisa onde está concentrada a massa da imagem horizontalmente."""
-    try:
-        from PIL import Image
-        import io
-        r = requests.get(img_url, timeout=6)
-        img = Image.open(io.BytesIO(r.content)).convert('RGBA')
 
-        width, height = img.size
-        # Usar só a metade superior (torso/cabeça, ignorar pernas)
-        img_top = img.crop((0, 0, width, height // 2))
-        pixels = list(img_top.getdata())
-
-        # Calcular centro de massa horizontal dos pixels não-transparentes
-        total_weight = 0
-        weighted_x = 0
-        for i, (r_val, g_val, b_val, a) in enumerate(pixels):
-            if a > 50:  # pixel visível
-                x = i % width
-                total_weight += 1
-                weighted_x += x
-
-        if total_weight == 0:
-            return True  # default
-
-        center_x = weighted_x / total_weight
-        # Se centro de massa está na metade direita → lutador virado para a esquerda
-        # Se centro de massa está na metade esquerda → lutador virado para a direita
-        return center_x < width * 0.5
-    except:
-        return True  # default: assumir virado para a direita
 
 def render_fight_card(c):
     fav    = c["f1"] if c["p1"] >= c["p2"] else c["f2"]
@@ -986,29 +951,21 @@ def render_fight_card(c):
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
 
-    # Buscar fotos e detectar direcção
-    photo_f1, f1_facing_right = get_fighter_photo(f1_name)
-    photo_f2, f2_facing_right = get_fighter_photo(f2_name)
+    # Buscar fotos
+    photo_f1 = get_fighter_photo(f1_name)
+    photo_f2 = get_fighter_photo(f2_name)
 
-    # F1 (esquerda): deve estar virado para a direita (para o centro)
-    # Se já está virado para a direita → não espelhar
-    # Se está virado para a esquerda → espelhar
-    f1_transform = "" if f1_facing_right else "transform:scaleX(-1);"
-    # F2 (direita): deve estar virado para a esquerda (para o centro)
-    # Se está virado para a direita → espelhar
-    # Se já está virado para a esquerda → não espelhar
-    f2_transform = "transform:scaleX(-1);" if f2_facing_right else ""
-
+    # F1 (esquerda): sem espelhar | F2 (direita): sempre espelhado para o centro
     photo_f1_html = (
         f'<img src="{photo_f1}" style="height:140px; object-fit:contain; '
-        f'{f1_transform} filter:drop-shadow(0 4px 12px rgba(200,16,46,0.3));">'
+        f'filter:drop-shadow(0 4px 12px rgba(200,16,46,0.3));">'
         if photo_f1 else
         f'<div style="height:140px; width:90px; display:flex; align-items:center; '
         f'justify-content:center; font-size:2.5rem;">🥊</div>'
     )
     photo_f2_html = (
         f'<img src="{photo_f2}" style="height:140px; object-fit:contain; '
-        f'{f2_transform} filter:drop-shadow(0 4px 12px rgba(26,108,255,0.3));">'
+        f'transform:scaleX(-1); filter:drop-shadow(0 4px 12px rgba(26,108,255,0.3));">'
         if photo_f2 else
         f'<div style="height:140px; width:90px; display:flex; align-items:center; '
         f'justify-content:center; font-size:2.5rem;">🥊</div>'

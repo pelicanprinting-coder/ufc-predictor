@@ -119,6 +119,64 @@ def get_card_evento(url_evento):
     except:
         return []
 
+
+@st.cache_data(ttl=1800)
+def get_polymarket_odds():
+    """Busca odds UFC do Polymarket"""
+    import json
+    try:
+        markets = {}
+        for offset in range(0, 300, 100):
+            r = requests.get(
+                f"https://gamma-api.polymarket.com/events?tag_slug=ufc&limit=100&offset={offset}",
+                headers={"User-Agent": "Mozilla/5.0"}, timeout=10
+            )
+            if r.status_code != 200:
+                break
+            batch = r.json()
+            if not batch:
+                break
+            for ev in batch:
+                for m in ev.get('markets', []):
+                    if m.get('closed') or not m.get('active'):
+                        continue
+                    outcomes_raw = m.get('outcomes', '[]')
+                    prices_raw = m.get('outcomePrices', '[]')
+                    try:
+                        outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+                        prices = [float(p) for p in (json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw)]
+                    except:
+                        continue
+                    if len(outcomes) != 2 or 'Yes' in outcomes or 'No' in outcomes:
+                        continue
+                    if float(m.get('volume', 0) or 0) < 50:
+                        continue
+                    # Guardar por par de fighters normalizados
+                    key = tuple(sorted([outcomes[0].lower().split()[-1], 
+                                        outcomes[1].lower().split()[-1]]))
+                    markets[key] = {
+                        'f1': outcomes[0], 'f2': outcomes[1],
+                        'p1': prices[0], 'p2': prices[1],
+                        'volume': float(m.get('volume', 0) or 0),
+                        'question': m.get('question', ''),
+                    }
+        return markets
+    except:
+        return {}
+
+def match_polymarket(f1_name, f2_name, pm_markets):
+    """Tenta fazer match de um combate com mercados do Polymarket"""
+    # Tentar por último nome
+    key = tuple(sorted([f1_name.lower().split()[-1], f2_name.lower().split()[-1]]))
+    if key in pm_markets:
+        m = pm_markets[key]
+        # Garantir que p1 corresponde a f1
+        if f1_name.lower().split()[-1] == m['f1'].lower().split()[-1]:
+            return m['p1'], m['p2'], m['volume']
+        else:
+            return m['p2'], m['p1'], m['volume']
+    return None, None, None
+
 models, features, lookup, models_dec, models_o25, features_dec, features_o25 = load_data()
 fighter_names = sorted(lookup["name"].dropna().tolist())
 
@@ -951,6 +1009,35 @@ def render_fight_card(c):
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
 
+    # Alerta Polymarket
+    pm_p1 = c.get("pm_p1")
+    pm_p2 = c.get("pm_p2")
+    pm_vol = c.get("pm_vol")
+    pm_alert_html = ""
+    if pm_p1 and pm_p2 and c["odds_f1"] and c["odds_f2"]:
+        bk_p1 = decimal_to_prob(c["odds_f1"])
+        bk_p2 = decimal_to_prob(c["odds_f2"])
+        diff1 = abs(pm_p1 - bk_p1)
+        diff2 = abs(pm_p2 - bk_p2)
+        max_diff = max(diff1, diff2)
+        if max_diff >= 0.10:
+            bigger_f = c["f1"] if diff1 >= diff2 else c["f2"]
+            pm_prob = pm_p1 if diff1 >= diff2 else pm_p2
+            bk_prob = bk_p1 if diff1 >= diff2 else bk_p2
+            direction = "↑" if pm_prob > bk_prob else "↓"
+            pm_alert_html = (
+                f'<span style="background:rgba(255,165,0,0.15); color:#ffa500; '
+                f'border:1px solid rgba(255,165,0,0.4); border-radius:4px; '
+                f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+                f'letter-spacing:0.05em;">'
+                f'⚠️ POLYMARKET DISCREPANCY: {bigger_f} {direction} '
+                f'Polymarket {pm_prob:.0%} vs Bookmaker {bk_prob:.0%} '
+                f'(Δ{max_diff:.0%}) · Vol ${pm_vol:,.0f}'
+                f'</span>'
+            )
+    if pm_alert_html:
+        warnings_html = (pm_alert_html + " " + warnings_html).strip()
+
     # Buscar fotos
     photo_f1 = get_fighter_photo(f1_name)
     photo_f2 = get_fighter_photo(f2_name)
@@ -1094,6 +1181,7 @@ with tab1:
     with st.spinner("Loading card and odds..."):
         eventos_ufc  = get_card_ufcstats()
         combates_api = get_upcoming_odds()
+        pm_markets   = get_polymarket_odds()
 
     # Lookup de odds
     odds_lookup = {}
@@ -1167,6 +1255,7 @@ with tab1:
                     p1, p2, _, _, _, _ = res
 
                 prob_fav = max(p1, p2)
+                pm_p1, pm_p2, pm_vol = match_polymarket(f1_ufc, f2_ufc, pm_markets)
                 combates_proc.append({
                     "f1": f1_ufc, "f2": f2_ufc,
                     "p1": p1, "p2": p2,
@@ -1177,6 +1266,7 @@ with tab1:
                     "rounds": 3,
                     "prob_decision": res[4] if len(res) > 4 else None,
                     "prob_over25":   res[5] if len(res) > 5 else None,
+                    "pm_p1": pm_p1, "pm_p2": pm_p2, "pm_vol": pm_vol,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))

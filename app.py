@@ -29,9 +29,9 @@ def normalizar_nome(nome):
 
 @st.cache_data
 def load_data():
-    with open("ufc_ensemble_final.pkl", "rb") as f:
+    with open("ufc_ensemble_v2.pkl", "rb") as f:
         models = pickle.load(f)
-    with open("features_final.pkl", "rb") as f:
+    with open("features_ensemble_v2.pkl", "rb") as f:
         features = pickle.load(f)
     lookup = pd.read_csv("fighter_lookup_final.csv")
 
@@ -257,6 +257,70 @@ def gh_update_resultados():
 
 def get_historico():
     return gh_get_historico()
+
+def gh_save_totals_odds():
+    """Recolhe e guarda odds de over/under antes de cada evento"""
+    if not API_KEY or not GITHUB_TOKEN:
+        return
+    try:
+        r = requests.get(
+            "https://api.the-odds-api.com/v4/sports/mma_mixed_martial_arts/odds",
+            params={"regions": "eu", "markets": "totals",
+                    "oddsFormat": "decimal", "apiKey": API_KEY},
+            timeout=15
+        )
+        if r.status_code != 200:
+            return
+        data = r.json()
+        rows = []
+        now = pd.Timestamp.now().strftime("%Y-%m-%d")
+        for e in data:
+            if not e.get('bookmakers'):
+                continue
+            for b in e['bookmakers']:
+                for m in b.get('markets', []):
+                    if m['key'] != 'totals':
+                        continue
+                    for outcome in m['outcomes']:
+                        rows.append({
+                            "fighter_1": e['home_team'],
+                            "fighter_2": e['away_team'],
+                            "bookmaker": b['title'],
+                            "type": outcome['name'],
+                            "point": outcome['point'],
+                            "price": outcome['price'],
+                            "fetched_at": now,
+                            "commence_time": e.get('commence_time','')[:10],
+                        })
+        if not rows:
+            return
+        new_df = pd.DataFrame(rows)
+
+        # Ler histórico existente
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/totals_odds_history.csv"
+        r2 = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, timeout=10)
+        if r2.status_code == 200:
+            content = base64.b64decode(r2.json()["content"]).decode("utf-8")
+            existing = pd.read_csv(io.StringIO(content))
+            combined = pd.concat([existing, new_df], ignore_index=True)
+            combined = combined.drop_duplicates(
+                subset=["fighter_1","fighter_2","bookmaker","type","point","fetched_at"],
+                keep="first"
+            )
+            sha = r2.json()["sha"]
+        else:
+            combined = new_df
+            sha = None
+
+        csv_content = combined.to_csv(index=False)
+        encoded = base64.b64encode(csv_content.encode()).decode()
+        payload = {"message": f"Update totals odds {now}", "content": encoded}
+        if sha:
+            payload["sha"] = sha
+        requests.put(url, headers={"Authorization": f"token {GITHUB_TOKEN}"},
+                     json=payload, timeout=30)
+    except Exception:
+        pass
 
 
 def get_fighter_row(name):
@@ -797,6 +861,61 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 # ── HELPERS DE RENDER ─────────────────────────────────────────────
+@st.cache_data(ttl=86400)
+def get_fighter_photo(name):
+    """Busca foto do lutador na ufc.com e detecta direcção"""
+    try:
+        slug = name.lower().replace(' ', '-')
+        url = f"https://www.ufc.com/athlete/{slug}"
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+        if r.status_code != 200:
+            return None, False
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(r.text, 'html.parser')
+        img = soup.find('img', class_='hero-profile__image')
+        if not img:
+            return None, False
+        src = img.get('src')
+
+        # Detectar direcção: analisar centro de massa horizontal da imagem
+        facing_right = detect_facing_direction(src)
+        return src, facing_right
+    except:
+        return None, False
+
+def detect_facing_direction(img_url):
+    """Detecta se o lutador está virado para a direita.
+    Analisa onde está concentrada a massa da imagem horizontalmente."""
+    try:
+        from PIL import Image
+        import io
+        r = requests.get(img_url, timeout=6)
+        img = Image.open(io.BytesIO(r.content)).convert('RGBA')
+
+        width, height = img.size
+        # Usar só a metade superior (torso/cabeça, ignorar pernas)
+        img_top = img.crop((0, 0, width, height // 2))
+        pixels = list(img_top.getdata())
+
+        # Calcular centro de massa horizontal dos pixels não-transparentes
+        total_weight = 0
+        weighted_x = 0
+        for i, (r_val, g_val, b_val, a) in enumerate(pixels):
+            if a > 50:  # pixel visível
+                x = i % width
+                total_weight += 1
+                weighted_x += x
+
+        if total_weight == 0:
+            return True  # default
+
+        center_x = weighted_x / total_weight
+        # Se centro de massa está na metade direita → lutador virado para a esquerda
+        # Se centro de massa está na metade esquerda → lutador virado para a direita
+        return center_x < width * 0.5
+    except:
+        return True  # default: assumir virado para a direita
+
 def render_fight_card(c):
     fav    = c["f1"] if c["p1"] >= c["p2"] else c["f2"]
     em, lbl, color, level = conviction_label(c["prob_fav"])
@@ -867,46 +986,90 @@ def render_fight_card(c):
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
 
+    # Buscar fotos e detectar direcção
+    photo_f1, f1_facing_right = get_fighter_photo(f1_name)
+    photo_f2, f2_facing_right = get_fighter_photo(f2_name)
+
+    # F1 (esquerda): deve estar virado para a direita (para o centro)
+    # Se já está virado para a direita → não espelhar
+    # Se está virado para a esquerda → espelhar
+    f1_transform = "" if f1_facing_right else "transform:scaleX(-1);"
+    # F2 (direita): deve estar virado para a esquerda (para o centro)
+    # Se está virado para a direita → espelhar
+    # Se já está virado para a esquerda → não espelhar
+    f2_transform = "transform:scaleX(-1);" if f2_facing_right else ""
+
+    photo_f1_html = (
+        f'<img src="{photo_f1}" style="height:140px; object-fit:contain; '
+        f'{f1_transform} filter:drop-shadow(0 4px 12px rgba(200,16,46,0.3));">'
+        if photo_f1 else
+        f'<div style="height:140px; width:90px; display:flex; align-items:center; '
+        f'justify-content:center; font-size:2.5rem;">🥊</div>'
+    )
+    photo_f2_html = (
+        f'<img src="{photo_f2}" style="height:140px; object-fit:contain; '
+        f'{f2_transform} filter:drop-shadow(0 4px 12px rgba(26,108,255,0.3));">'
+        if photo_f2 else
+        f'<div style="height:140px; width:90px; display:flex; align-items:center; '
+        f'justify-content:center; font-size:2.5rem;">🥊</div>'
+    )
+
     html = (
-        f'<div class="fight-card {card_class}">'
-        f'  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
-        f'    <div class="fight-names">'
-        f'      <span class="{f1_class}">{f1_name}</span>'
-        f'      <span class="vs">VS</span>'
-        f'      <span class="{f2_class}">{f2_name}</span>'
+        f'<div class="fight-card {card_class}" style="overflow:hidden;">'
+        f'  <div style="display:flex; align-items:stretch; gap:0;">'
+        f'    <!-- Foto F1 -->'
+        f'    <div style="width:100px; display:flex; align-items:flex-end; justify-content:center;'
+        f'         padding-bottom:0; flex-shrink:0;">'
+        f'      {photo_f1_html}'
         f'    </div>'
-        f'    <div class="conviction-badge conv-{level}">{em} {lbl}</div>'
-        f'  </div>'
-        f'  <div class="prob-bar-wrap">'
-        f'    <div class="prob-bar-labels">'
-        f'      <span><span class="name-left">{f1_name}</span>'
-        f'            <span class="pct-left"> {p1_str}</span></span>'
-        f'      <span><span class="pct-right">{p2_str} </span>'
-        f'            <span class="name-right">{f2_name}</span></span>'
-        f'    </div>'
-        f'    <div class="prob-bar-outer">'
-        f'      <div style="height:100%; display:flex;">'
-        f'        <div style="width:{p1_w}; background:linear-gradient(90deg,#C8102E,#e8253f);'
-        f'             border-radius:999px 0 0 999px;"></div>'
-        f'        <div style="width:{p2_w}; background:linear-gradient(90deg,#1a6cff,#60a5fa);'
-        f'             border-radius:0 999px 999px 0; margin-left:auto;"></div>'
+        f'    <!-- Conteúdo central -->'
+        f'    <div style="flex:1; padding:14px 12px 12px;">'
+        f'      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
+        f'        <div class="fight-names">'
+        f'          <span class="{f1_class}">{f1_name}</span>'
+        f'          <span class="vs">VS</span>'
+        f'          <span class="{f2_class}">{f2_name}</span>'
+        f'        </div>'
+        f'        <div class="conviction-badge conv-{level}">{em} {lbl}</div>'
         f'      </div>'
+        f'      <div class="prob-bar-wrap">'
+        f'        <div class="prob-bar-labels">'
+        f'          <span><span class="name-left">{f1_name}</span>'
+        f'                <span class="pct-left"> {p1_str}</span></span>'
+        f'          <span><span class="pct-right">{p2_str} </span>'
+        f'                <span class="name-right">{f2_name}</span></span>'
+        f'        </div>'
+        f'        <div class="prob-bar-outer">'
+        f'          <div style="height:100%; display:flex;">'
+        f'            <div style="width:{p1_w}; background:linear-gradient(90deg,#C8102E,#e8253f);'
+        f'                 border-radius:999px 0 0 999px;"></div>'
+        f'            <div style="width:{p2_w}; background:linear-gradient(90deg,#1a6cff,#60a5fa);'
+        f'                 border-radius:0 999px 999px 0; margin-left:auto;"></div>'
+        f'          </div>'
+        f'        </div>'
+        f'      </div>'
+        f'      <div class="odds-row">'
+        f'        <div>'
+        f'          <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f1_str}</span></span>'
+        f'          <span class="odds-chip">Market <span class="ov">{mkt_f1_str}</span></span>'
+        f'          {edge_f1_html}'
+        f'          {ev_f1_html}'
+        f'        </div>'
+        f'        <div style="font-size:0.75rem; color:var(--muted);">Favourite:'
+        f'          <strong style="color:var(--gold);">{fav}</strong>'
+        f'        </div>'
+        f'        <div>'
+        f'          {edge_f2_html}'
+        f'          <span class="odds-chip">Market <span class="ov">{mkt_f2_str}</span></span>'
+        f'          <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f2_str}</span></span>'
+        f'        </div>'
+        f'      </div>'
+        f'      {f'<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">{warnings_html}</div>' if warnings_html else ''}'
         f'    </div>'
-        f'  </div>'
-        f'  <div class="odds-row">'
-        f'    <div>'
-        f'      <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f1_str}</span></span>'
-        f'      <span class="odds-chip">Market <span class="ov">{mkt_f1_str}</span></span>'
-        f'      {edge_f1_html}'
-        f'      {ev_f1_html}'
-        f'    </div>'
-        f'    <div style="font-size:0.75rem; color:var(--muted);">Favourite:'
-        f'      <strong style="color:var(--gold);">{fav}</strong>'
-        f'    </div>'
-        f'    <div>'
-        f'      {edge_f2_html}'
-        f'      <span class="odds-chip">Market <span class="ov">{mkt_f2_str}</span></span>'
-        f'      <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f2_str}</span></span>'
+        f'    <!-- Foto F2 -->'
+        f'    <div style="width:100px; display:flex; align-items:flex-end; justify-content:center;'
+        f'         padding-bottom:0; flex-shrink:0;">'
+        f'      {photo_f2_html}'
         f'    </div>'
         f'  </div>'
         f'</div>'
@@ -922,14 +1085,14 @@ st.markdown("""
 <div class="ufc-header">
   <div>
     <div class="ufc-logo-text">🥊 UFC FIGHT PREDICTOR</div>
-    <div class="ufc-subtitle">Ensemble v4 · Powered by Machine Learning</div>
+    <div class="ufc-subtitle">Ensemble v5 · Powered by Machine Learning</div>
   </div>
 </div>
 <div style="margin: 10px 0 22px;">
-  <span class="badge-stat">🎯 Accuracy <span>68.45%</span></span>
+  <span class="badge-stat">🎯 Accuracy <span>67.84%</span></span>
   <span class="badge-stat">🤖 Models <span>5 ensemble</span></span>
-  <span class="badge-stat">⚡ Conviction 80%+ <span>90.2% acc</span></span>
-  <span class="badge-stat">📈 ROI 80%+ <span>+3.9%</span></span>
+  <span class="badge-stat">📊 Test set <span>1,645 fights</span></span>
+  <span class="badge-stat">🔒 Leak-free <span>2023–2026</span></span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -999,11 +1162,22 @@ with tab1:
         st.error("⚠️ Could not load UFC card.")
     else:
         if GITHUB_TOKEN and eventos_ufc:
-            st.toast("✅ Predictions saved to history")
+            if not st.session_state.get("history_toast_shown"):
+                st.toast("✅ Predictions saved to history")
+                st.session_state["history_toast_shown"] = True
             try:
                 gh_update_resultados()
             except:
                 pass
+            # Recolher totals odds uma vez por dia
+            last_totals = st.session_state.get("last_totals_fetch", None)
+            today_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+            if last_totals != today_str:
+                try:
+                    gh_save_totals_odds()
+                    st.session_state["last_totals_fetch"] = today_str
+                except:
+                    pass
         for evento in eventos_ufc:
             # Event header
             st.markdown(f"""
@@ -1430,9 +1604,12 @@ with tab3:
         df_show = df_show.sort_values("saved_at", ascending=False)
 
         for _, row in df_show.iterrows():
-            correct_icon = row["correct"] if row["correct"] != "" else "⏳"
-            winner_display = row["actual_winner"] if row["actual_winner"] != "" else "Pending"
-            pred_col = "#22c55e" if row["correct"] == "✅" else ("#e8253f" if row["correct"] == "❌" else "#D4AF37")
+            correct_val = row["correct"]
+            correct_val = "" if pd.isna(correct_val) else str(correct_val)
+            correct_icon = correct_val if correct_val in ["✅","❌"] else "⏳"
+            actual = row["actual_winner"]
+            winner_display = "Pending" if (pd.isna(actual) or str(actual).strip() == "") else str(actual)
+            pred_col = "#22c55e" if correct_val == "✅" else ("#e8253f" if correct_val == "❌" else "#D4AF37")
 
             st.markdown(f"""
             <div style="background:var(--bg2); border:1px solid var(--border);

@@ -391,6 +391,112 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
+# ── PASSO 5: RE-TREINAR MODELO ────────────────────────────────────
+print("\n[5/5] A re-treinar ensemble...")
+try:
+    import pickle
+    from xgboost import XGBClassifier
+    from lightgbm import LGBMClassifier
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import Pipeline
+    from catboost import CatBoostClassifier
+    from sklearn.metrics import accuracy_score
+
+    # Carregar features
+    features = pickle.load(open("features_ensemble_v2.pkl", "rb"))
+
+    # Reconstruir df_sorted (pipeline completo já correu acima)
+    # Usar df_rolling e df_ult já calculados
+    # Merge com ufc-master para ter target e odds
+    df_ult2 = pd.read_csv("ultimate_ufc_dataset/ufc-master.csv")
+    df_ult2["date"] = pd.to_datetime(df_ult2["date"], errors="coerce")
+    df_ult2 = df_ult2[df_ult2["Winner"].isin(["Red","Blue"])].copy()
+    df_ult2["target"] = (df_ult2["Winner"] == "Red").astype(int)
+
+    # Carregar lookup actualizado
+    lookup_new = pd.read_csv("fighter_lookup_final.csv")
+
+    # Construir features para cada combate
+    def build_row(row, lookup):
+        r = lookup[lookup["name"] == row["R_fighter"]]
+        b = lookup[lookup["name"] == row["B_fighter"]]
+        if r.empty or b.empty:
+            return None
+        r, b = r.iloc[0], b.iloc[0]
+        feat_row = {}
+        for feat in features:
+            if feat.endswith("_diff"):
+                base = feat[:-5]
+                feat_row[feat] = r.get(base, 0) - b.get(base, 0)
+            elif feat.endswith("_dif"):
+                base = feat[:-4]
+                feat_row[feat] = r.get(base, 0) - b.get(base, 0)
+            elif feat in ["R_ranked","B_ranked","rank_dif","odds_prob_diff",
+                          "style_clash_position","style_clash_target","grappling_advantage"]:
+                feat_row[feat] = row.get(feat, 0)
+            else:
+                feat_row[feat] = row.get(feat, 0)
+        return feat_row
+
+    # Usar df_sorted se disponível, senão construir do lookup
+    # Como estamos num script separado, vamos usar uma abordagem simplificada:
+    # carregar o df_sorted pickle se existir
+    if os.path.exists("df_sorted.pkl"):
+        df_train = pickle.load(open("df_sorted.pkl", "rb"))
+        print(f"  df_sorted carregado: {len(df_train):,} combates")
+    else:
+        print("  ⚠️  df_sorted.pkl não encontrado — a saltar re-treino")
+        print("  Corre o notebook UFC.ipynb para gerar df_sorted.pkl")
+        raise FileNotFoundError("df_sorted.pkl não encontrado")
+
+    df_train["date"] = pd.to_datetime(df_train["date"], errors="coerce")
+
+    # Split: treino até 2025, teste 2026+
+    treino = df_train[df_train["date"] < "2023-01-01"]
+    teste  = df_train[df_train["date"] >= "2023-01-01"]
+
+    print(f"  Treino: {len(treino):,} | Teste: {len(teste):,}")
+
+    X_tr = treino[features].fillna(0)
+    y_tr = treino["target"]
+    X_te = teste[features].fillna(0)
+    y_te = teste["target"]
+
+    models_retrain = {
+        "XGBoost":      XGBClassifier(n_estimators=500, max_depth=3, learning_rate=0.01,
+                                       subsample=0.8, random_state=42, eval_metric="logloss"),
+        "LightGBM":     LGBMClassifier(n_estimators=500, max_depth=3, learning_rate=0.01,
+                                        subsample=0.8, random_state=42, verbose=-1),
+        "RandomForest": RandomForestClassifier(n_estimators=500, max_depth=6,
+                                               random_state=42, n_jobs=-1),
+        "LogReg":       Pipeline([("scaler", StandardScaler()),
+                                   ("clf", LogisticRegression(max_iter=1000, random_state=42))]),
+        "CatBoost":     CatBoostClassifier(iterations=500, depth=3, learning_rate=0.01,
+                                            random_state=42, verbose=0),
+    }
+
+    for name, model in models_retrain.items():
+        model.fit(X_tr, y_tr)
+
+    # Accuracy no teste
+    if len(teste) > 0:
+        probs = np.mean([m.predict_proba(X_te)[:,1] for m in models_retrain.values()], axis=0)
+        acc = accuracy_score(y_te, (probs > 0.5).astype(int))
+        print(f"  Accuracy no teste: {acc:.2%} ({len(teste):,} combates)")
+
+    # Guardar
+    pickle.dump(models_retrain, open("ufc_ensemble_v2.pkl", "wb"))
+    print(f"  ✅ Ensemble re-treinado e guardado")
+
+except FileNotFoundError as e:
+    print(f"  ⚠️  {e}")
+except Exception as e:
+    import traceback
+    print(f"  ❌ Erro no re-treino: {e}")
+    traceback.print_exc()
+
 print("\n" + "=" * 60)
 print("✅ UPDATE COMPLETO")
 print("=" * 60)

@@ -122,48 +122,43 @@ def get_card_evento(url_evento):
 
 @st.cache_data(ttl=1800)
 def get_polymarket_odds():
-    """Busca odds UFC do Polymarket"""
+    """Busca odds UFC do Polymarket — apenas eventos não fechados"""
     import json
     try:
         markets = {}
-        for offset in range(0, 300, 100):
-            r = requests.get(
-                f"https://gamma-api.polymarket.com/events?tag_slug=ufc&limit=100&offset={offset}",
-                headers={"User-Agent": "Mozilla/5.0"}, timeout=10
-            )
-            if r.status_code != 200:
-                break
-            batch = r.json()
-            if not batch:
-                break
-            for ev in batch:
-                for m in ev.get('markets', []):
-                    if m.get('closed') or not m.get('active'):
-                        continue
-                    outcomes_raw = m.get('outcomes', '[]')
-                    prices_raw = m.get('outcomePrices', '[]')
-                    try:
-                        outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
-                        prices = [float(p) for p in (json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw)]
-                    except:
-                        continue
-                    if len(outcomes) != 2 or 'Yes' in outcomes or 'No' in outcomes:
-                        continue
-                    if float(m.get('volume', 0) or 0) < 50:
-                        continue
-                    # Guardar por par de fighters normalizados
-                    key = tuple(sorted([outcomes[0].lower().split()[-1], 
-                                        outcomes[1].lower().split()[-1]]))
+        r = requests.get(
+            "https://gamma-api.polymarket.com/events?tag_slug=ufc&limit=200&closed=false",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=10
+        )
+        if r.status_code != 200:
+            return {}
+        batch = r.json()
+        for ev in batch:
+            for m in ev.get('markets', []):
+                outcomes_raw = m.get('outcomes', '[]')
+                prices_raw = m.get('outcomePrices', '[]')
+                try:
+                    outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+                    prices = [float(p) for p in (json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw)]
+                except:
+                    continue
+                if len(outcomes) != 2 or 'Yes' in outcomes or 'No' in outcomes:
+                    continue
+                if not prices or prices[0] in [0.0, 1.0] or prices[1] in [0.0, 1.0]:
+                    continue
+                key = tuple(sorted([outcomes[0].lower().split()[-1],
+                                    outcomes[1].lower().split()[-1]]))
+                vol = float(m.get('volume', 0) or 0)
+                if key not in markets or vol > markets[key]['volume']:
                     markets[key] = {
                         'f1': outcomes[0], 'f2': outcomes[1],
                         'p1': prices[0], 'p2': prices[1],
-                        'volume': float(m.get('volume', 0) or 0),
+                        'volume': vol,
                         'question': m.get('question', ''),
                     }
         return markets
     except:
         return {}
-
 def match_polymarket(f1_name, f2_name, pm_markets):
     """Tenta fazer match de um combate com mercados do Polymarket"""
     # Tentar por último nome

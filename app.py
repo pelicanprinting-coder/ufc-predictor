@@ -1004,32 +1004,38 @@ def render_fight_card(c):
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
 
-    # Alerta Polymarket
+    # Polymarket odds
     pm_p1 = c.get("pm_p1")
     pm_p2 = c.get("pm_p2")
     pm_vol = c.get("pm_vol")
     pm_alert_html = ""
-    if pm_p1 and pm_p2 and c["odds_f1"] and c["odds_f2"]:
-        bk_p1 = decimal_to_prob(c["odds_f1"])
-        bk_p2 = decimal_to_prob(c["odds_f2"])
-        diff1 = abs(pm_p1 - bk_p1)
-        diff2 = abs(pm_p2 - bk_p2)
-        max_diff = max(diff1, diff2)
-        if max_diff >= 0.10:
-            bigger_f = c["f1"] if diff1 >= diff2 else c["f2"]
-            pm_prob = pm_p1 if diff1 >= diff2 else pm_p2
-            bk_prob = bk_p1 if diff1 >= diff2 else bk_p2
-            direction = "↑" if pm_prob > bk_prob else "↓"
-            pm_alert_html = (
-                f'<span style="background:rgba(255,165,0,0.15); color:#ffa500; '
-                f'border:1px solid rgba(255,165,0,0.4); border-radius:4px; '
-                f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
-                f'letter-spacing:0.05em;">'
-                f'⚠️ POLYMARKET DISCREPANCY: {bigger_f} {direction} '
-                f'Polymarket {pm_prob:.0%} vs Bookmaker {bk_prob:.0%} '
-                f'(Δ{max_diff:.0%}) · Vol ${pm_vol:,.0f}'
-                f'</span>'
-            )
+    if pm_p1 and pm_p2:
+        # Verificar discrepância com bookmakers
+        discrepancy_html = ""
+        if c["odds_f1"] and c["odds_f2"]:
+            bk_p1 = decimal_to_prob(c["odds_f1"])
+            bk_p2 = decimal_to_prob(c["odds_f2"])
+            diff1 = abs(pm_p1 - bk_p1)
+            diff2 = abs(pm_p2 - bk_p2)
+            max_diff = max(diff1, diff2)
+            if max_diff >= 0.10:
+                bigger_f = c["f1"] if diff1 >= diff2 else c["f2"]
+                pm_prob  = pm_p1 if diff1 >= diff2 else pm_p2
+                bk_prob  = bk_p1 if diff1 >= diff2 else bk_p2
+                direction = "↑" if pm_prob > bk_prob else "↓"
+                discrepancy_html = (
+                    f' · <span style="color:#ffa500; font-weight:700;">'
+                    f'⚠️ {bigger_f} {direction} Δ{max_diff:.0%}</span>'
+                )
+        pm_alert_html = (
+            f'<span style="background:rgba(139,92,246,0.12); color:#a78bfa; '
+            f'border:1px solid rgba(139,92,246,0.3); border-radius:4px; '
+            f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+            f'letter-spacing:0.05em;">'
+            f'🔮 Polymarket: {c["f1"]} {pm_p1:.0%} · {c["f2"]} {pm_p2:.0%} '
+            f'· Vol ${pm_vol:,.0f}{discrepancy_html}'
+            f'</span>'
+        )
     if pm_alert_html:
         warnings_html = (pm_alert_html + " " + warnings_html).strip()
 

@@ -29,9 +29,9 @@ def normalizar_nome(nome):
 
 @st.cache_data
 def load_data():
-    with open("ufc_ensemble_v2.pkl", "rb") as f:
+    with open("ufc_ensemble_v3.pkl", "rb") as f:
         models = pickle.load(f)
-    with open("features_ensemble_v2.pkl", "rb") as f:
+    with open("features_ensemble_v3.pkl", "rb") as f:
         features = pickle.load(f)
     lookup = pd.read_csv("fighter_lookup_final.csv")
 
@@ -543,6 +543,11 @@ def build_features(r, b, r_odds=None, b_odds=None):
     r_prob = decimal_to_prob(r_odds) or 0.5
     b_prob = decimal_to_prob(b_odds) or 0.5
     feats["odds_prob_diff"] = r_prob - b_prob
+
+    # rest_diff: dias de descanso (dias_inativo é proxy)
+    r_rest = float(r.get("dias_inativo", 180) or 180)
+    b_rest = float(b.get("dias_inativo", 180) or 180)
+    feats["rest_diff"] = r_rest - b_rest
 
     return pd.DataFrame([feats])[features].fillna(0)
 
@@ -1326,11 +1331,11 @@ st.markdown("""
 <div class="ufc-header">
   <div>
     <div class="ufc-logo-text">🥊 UFC FIGHT PREDICTOR</div>
-    <div class="ufc-subtitle">Ensemble v5 · Powered by Machine Learning</div>
+    <div class="ufc-subtitle">Ensemble v6 · Powered by Machine Learning</div>
   </div>
 </div>
 <div style="margin: 10px 0 22px;">
-  <span class="badge-stat">🎯 Accuracy <span>65.65%</span></span>
+  <span class="badge-stat">🎯 Accuracy <span>68.55%</span></span>
   <span class="badge-stat">🤖 Models <span>5 ensemble</span></span>
   <span class="badge-stat">⚡ High Conviction <span>83.5% acc</span></span>
   <span class="badge-stat">🎯 Moderate <span>79.3% acc</span></span>

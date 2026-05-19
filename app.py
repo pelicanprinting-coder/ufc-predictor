@@ -1259,6 +1259,7 @@ def render_fight_card(c, odds_history=None):
         f'justify-content:center; font-size:2.5rem;">🥊</div>'
     )
 
+    warnings_div = ('<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">' + warnings_html + '</div>') if warnings_html else ''
     html = (
         f'<div class="fight-card {card_class}" style="overflow:hidden;">'
         f'  <div style="display:flex; align-items:stretch; gap:0;">'
@@ -1309,8 +1310,8 @@ def render_fight_card(c, odds_history=None):
         f'          <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f2_str}</span></span>'
         f'        </div>'
         f'      </div>'
-        f'      {'<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">' + warnings_html + '</div>' if warnings_html else ''}
-        {odds_sparkline_html}'
+        f'      {warnings_div}'
+        f'      {odds_sparkline_html}'
         f'    </div>'
         f'    <!-- Foto F2 -->'
         f'    <div style="width:100px; display:flex; align-items:flex-end; justify-content:center;'

@@ -605,9 +605,9 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
     return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25
 
 def conviction_label(prob):
-    if prob >= 0.80: return 0, "HIGH CONVICTION", "#D4AF37", "high"
-    if prob >= 0.75: return 1, "MODERATE CONVICTION", "#C0A030", "moderate"
-    if prob >= 0.65: return 2, "SLIGHT FAVOURITE", "#888888", "slight"
+    if prob >= 0.75: return 0, "HIGH CONVICTION 83%", "#D4AF37", "high"
+    if prob >= 0.70: return 1, "MODERATE CONVICTION 79%", "#C0A030", "moderate"
+    if prob >= 0.60: return 2, "SLIGHT FAVOURITE 74%", "#888888", "slight"
     return 3, "TOO CLOSE TO CALL", "#555555", "close"
 
 
@@ -1330,10 +1330,10 @@ st.markdown("""
   </div>
 </div>
 <div style="margin: 10px 0 22px;">
-  <span class="badge-stat">🎯 Accuracy <span>67.84%</span></span>
+  <span class="badge-stat">🎯 Accuracy <span>65.65%</span></span>
   <span class="badge-stat">🤖 Models <span>5 ensemble</span></span>
-  <span class="badge-stat">📊 Test set <span>1,645 fights</span></span>
-  <span class="badge-stat">🔒 Leak-free <span>2023–2026</span></span>
+  <span class="badge-stat">⚡ High Conviction <span>83.5% acc</span></span>
+  <span class="badge-stat">🎯 Moderate <span>79.3% acc</span></span>
 </div>
 """, unsafe_allow_html=True)
 

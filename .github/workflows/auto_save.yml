@@ -1,0 +1,32 @@
+name: Auto-Save UFC Predictions
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  save-predictions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests pandas numpy scikit-learn xgboost lightgbm catboost beautifulsoup4 python-dotenv
+    
+    - name: Run auto-save script
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        GITHUB_REPO: ${{ github.repository }}
+      run: |
+        python auto_save_predictions.py

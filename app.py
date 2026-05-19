@@ -48,7 +48,15 @@ def load_data():
             features_o25 = pickle.load(f)
     except:
         pass
-    return models, features, lookup, models_dec, models_o25, features_dec, features_o25
+    meta_model, meta_feats = None, None
+    try:
+        with open("ufc_meta_model.pkl", "rb") as f:
+            meta_model = pickle.load(f)
+        with open("meta_features.pkl", "rb") as f:
+            meta_feats = pickle.load(f)
+    except:
+        pass
+    return models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats
 
 @st.cache_data(ttl=3600)
 def get_upcoming_odds():
@@ -172,7 +180,7 @@ def match_polymarket(f1_name, f2_name, pm_markets):
             return m['p2'], m['p1'], m['volume']
     return None, None, None
 
-models, features, lookup, models_dec, models_o25, features_dec, features_o25 = load_data()
+models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats = load_data()
 fighter_names = sorted(lookup["name"].dropna().tolist())
 
 # ── FUNÇÕES ───────────────────────────────────────────────────────
@@ -607,7 +615,27 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
         except:
             pass
 
-    return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25
+    # Meta-modelo
+    meta_score = None
+    if meta_model is not None and meta_feats is not None:
+        try:
+            odds_prob = (decimal_to_prob(odds_f1) or 0.5) - (decimal_to_prob(odds_f2) or 0.5)
+            confidence = abs(prob_winner - 0.5)
+            ensemble_vs_odds = prob_winner - (odds_prob / 2 + 0.5)
+            meta_X = pd.DataFrame([{
+                'ensemble_prob': prob_winner,
+                'confidence': confidence,
+                'odds_prob': odds_prob,
+                'ensemble_vs_odds': ensemble_vs_odds,
+                'rest_diff': 0,
+                'clv_diff': 0,
+                'odds_magnitude': abs(odds_prob),
+            }])[meta_feats]
+            meta_score = float(meta_model.predict_proba(meta_X)[0][1])
+        except:
+            pass
+
+    return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25, meta_score
 
 def conviction_label(prob):
     if prob >= 0.75: return 0, "HIGH CONVICTION 83%", "#D4AF37", "high"
@@ -1049,6 +1077,26 @@ def get_fighter_photo(name):
 def render_fight_card(c, odds_history=None):
     fav    = c["f1"] if c["p1"] >= c["p2"] else c["f2"]
     em, lbl, color, level = conviction_label(c["prob_fav"])
+    meta_score = c.get("meta_score")
+    meta_html = ""
+    if meta_score is not None and meta_score >= 0.75:
+        meta_html = (
+            f'<span style="background:rgba(34,197,94,0.15); color:#22c55e; '
+            f'border:1px solid rgba(34,197,94,0.4); border-radius:4px; '
+            f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+            f'letter-spacing:0.05em;">'
+            f'✅ META-MODEL CONFIRMED {meta_score:.0%}'
+            f'</span>'
+        )
+    elif meta_score is not None and meta_score >= 0.65:
+        meta_html = (
+            f'<span style="background:rgba(251,191,36,0.12); color:#fbbf24; '
+            f'border:1px solid rgba(251,191,36,0.3); border-radius:4px; '
+            f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+            f'letter-spacing:0.05em;">'
+            f'⚡ META-MODEL {meta_score:.0%}'
+            f'</span>'
+        )
     card_class = {"high": "fight-card-high", "moderate": "fight-card-med",
                   "slight": "fight-card-low", "close": "fight-card-draw"}[level]
     prob_decision = c.get("prob_decision")
@@ -1259,7 +1307,8 @@ def render_fight_card(c, odds_history=None):
         f'justify-content:center; font-size:2.5rem;">🥊</div>'
     )
 
-    warnings_div = ('<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">' + warnings_html + '</div>') if warnings_html else ''
+    combined_warnings = ' '.join(filter(None, [meta_html, warnings_html]))
+    warnings_div = ('<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">' + combined_warnings + '</div>') if combined_warnings else ''
     html = (
         f'<div class="fight-card {card_class}" style="overflow:hidden;">'
         f'  <div style="display:flex; align-items:stretch; gap:0;">'
@@ -1452,12 +1501,12 @@ with tab1:
                 if res is None:
                     res = prever(f2_ufc, f1_ufc, odds_f2, odds_f1)
                     if res is not None:
-                        p2, p1, _, _, _, _ = res
+                        p2, p1, _, _, _, _, _ = res
                     else:
                         sem_dados.append(f"{f1_ufc} vs {f2_ufc}")
                         continue
                 else:
-                    p1, p2, _, _, _, _ = res
+                    p1, p2, _, _, _, _, _ = res
 
                 prob_fav = max(p1, p2)
                 pm_p1, pm_p2, pm_vol = match_polymarket(f1_ufc, f2_ufc, pm_markets)
@@ -1474,6 +1523,7 @@ with tab1:
                     "prob_over25":   res[5] if len(res) > 5 else None,
                     "pm_p1": pm_p1, "pm_p2": pm_p2, "pm_vol": pm_vol,
                     "disagreement": disagreement,
+                    "meta_score": res[6] if len(res) > 6 else None,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))
@@ -1611,7 +1661,7 @@ with tab2:
             if res is None:
                 st.error("❌ Insufficient data for one or both fighters.")
             else:
-                prob_r, prob_b, red, blue, prob_decision, prob_over25 = res
+                prob_r, prob_b, red, blue, prob_decision, prob_over25, meta_score = res
                 winner  = red_name if prob_r > prob_b else blue_name
                 w_corner = "🔴" if prob_r > prob_b else "🔵"
                 em, lbl, color, level = conviction_label(max(prob_r, prob_b))

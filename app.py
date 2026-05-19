@@ -446,6 +446,43 @@ def gh_get_moneyline_history():
     except:
         return pd.DataFrame()
 
+def calc_bookmaker_disagreement(f1_name, f2_name, combates_api):
+    """Calcula disagreement entre bookmakers para um combate"""
+    f1_lower = f1_name.lower()
+    f2_lower = f2_name.lower()
+
+    for c in combates_api:
+        h = normalizar_nome(c["home_team"]).lower()
+        a = normalizar_nome(c["away_team"]).lower()
+        if not ((h == f1_lower and a == f2_lower) or (h == f2_lower and a == f1_lower)):
+            continue
+
+        odds_f1, odds_f2 = [], []
+        for bm in c.get("bookmakers", []):
+            for mkt in bm.get("markets", []):
+                if mkt["key"] == "h2h":
+                    for o in mkt["outcomes"]:
+                        nome = normalizar_nome(o["name"]).lower()
+                        if nome == f1_lower:
+                            odds_f1.append(o["price"])
+                        elif nome == f2_lower:
+                            odds_f2.append(o["price"])
+
+        if len(odds_f1) < 3 or len(odds_f2) < 3:
+            return None
+
+        spread_f1 = max(odds_f1) - min(odds_f1)
+        spread_f2 = max(odds_f2) - min(odds_f2)
+
+        return {
+            'f1_spread': round(spread_f1, 3),
+            'f2_spread': round(spread_f2, 3),
+            'f1_min': min(odds_f1), 'f1_max': max(odds_f1),
+            'f2_min': min(odds_f2), 'f2_max': max(odds_f2),
+            'n_bookmakers': len(odds_f1),
+        }
+    return None
+
 def get_fighter_row(name):
     row = lookup[lookup["name"] == name]
     if not row.empty:
@@ -1074,6 +1111,30 @@ def render_fight_card(c, odds_history=None):
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
 
+    # Bookmaker disagreement
+    disagreement = c.get("disagreement")
+    disagree_html = ""
+    if disagreement:
+        f1_sp = disagreement["f1_spread"]
+        f2_sp = disagreement["f2_spread"]
+        max_sp = max(f1_sp, f2_sp)
+        if max_sp >= 0.30:
+            bigger = c["f1"] if f1_sp >= f2_sp else c["f2"]
+            sp = f1_sp if f1_sp >= f2_sp else f2_sp
+            mn = disagreement["f1_min"] if f1_sp >= f2_sp else disagreement["f2_min"]
+            mx = disagreement["f1_max"] if f1_sp >= f2_sp else disagreement["f2_max"]
+            n_bm = disagreement["n_bookmakers"]
+            disagree_html = (
+                f'<span style="background:rgba(251,191,36,0.12); color:#fbbf24; '
+                f'border:1px solid rgba(251,191,36,0.3); border-radius:4px; '
+                f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+                f'letter-spacing:0.05em;">'
+                f'📊 MARKET SPLIT: {bigger} {mn:.2f}–{mx:.2f} across {n_bm} books (Δ{sp:.2f})'
+                f'</span>'
+            )
+    if disagree_html:
+        warnings_html = (disagree_html + " " + warnings_html).strip()
+
     # Polymarket odds
     pm_p1 = c.get("pm_p1")
     pm_p2 = c.get("pm_p2")
@@ -1394,6 +1455,7 @@ with tab1:
 
                 prob_fav = max(p1, p2)
                 pm_p1, pm_p2, pm_vol = match_polymarket(f1_ufc, f2_ufc, pm_markets)
+                disagreement = calc_bookmaker_disagreement(f1_ufc, f2_ufc, combates_api)
                 combates_proc.append({
                     "f1": f1_ufc, "f2": f2_ufc,
                     "p1": p1, "p2": p2,
@@ -1405,6 +1467,7 @@ with tab1:
                     "prob_decision": res[4] if len(res) > 4 else None,
                     "prob_over25":   res[5] if len(res) > 5 else None,
                     "pm_p1": pm_p1, "pm_p2": pm_p2, "pm_vol": pm_vol,
+                    "disagreement": disagreement,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))

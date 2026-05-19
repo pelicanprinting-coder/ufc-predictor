@@ -376,6 +376,76 @@ def gh_save_totals_odds():
         pass
 
 
+
+def gh_save_moneyline_odds(combates_api):
+    """Guarda snapshot diário das odds de moneyline no GitHub"""
+    if not GITHUB_TOKEN or not combates_api:
+        return
+    try:
+        rows = []
+        now = pd.Timestamp.now().strftime("%Y-%m-%d")
+        for c in combates_api:
+            f1 = normalizar_nome(c["home_team"])
+            f2 = normalizar_nome(c["away_team"])
+            odds_f1_list, odds_f2_list = [], []
+            for bm in c.get("bookmakers", []):
+                for mkt in bm.get("markets", []):
+                    if mkt["key"] == "h2h":
+                        for outcome in mkt["outcomes"]:
+                            nome = normalizar_nome(outcome["name"])
+                            if nome == f1:
+                                odds_f1_list.append(outcome["price"])
+                            elif nome == f2:
+                                odds_f2_list.append(outcome["price"])
+            if odds_f1_list and odds_f2_list:
+                rows.append({
+                    "fighter_1": f1,
+                    "fighter_2": f2,
+                    "odds_1": round(float(np.median(odds_f1_list)), 3),
+                    "odds_2": round(float(np.median(odds_f2_list)), 3),
+                    "fetched_at": now,
+                    "commence_time": c.get("commence_time", "")[:10],
+                })
+        if not rows:
+            return
+
+        new_df = pd.DataFrame(rows)
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/moneyline_odds_history.csv"
+        r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, timeout=10)
+        if r.status_code == 200:
+            existing = pd.read_csv(io.StringIO(base64.b64decode(r.json()["content"]).decode("utf-8")))
+            combined = pd.concat([existing, new_df], ignore_index=True)
+            combined = combined.drop_duplicates(subset=["fighter_1","fighter_2","fetched_at"], keep="first")
+            sha = r.json()["sha"]
+        else:
+            combined = new_df
+            sha = None
+
+        csv_content = combined.to_csv(index=False)
+        encoded = base64.b64encode(csv_content.encode()).decode()
+        payload = {"message": f"Update moneyline odds {now}", "content": encoded}
+        if sha:
+            payload["sha"] = sha
+        requests.put(url, headers={"Authorization": f"token {GITHUB_TOKEN}"},
+                     json=payload, timeout=30)
+    except Exception as e:
+        print(f"Erro a guardar moneyline odds: {e}")
+
+@st.cache_data(ttl=3600)
+def gh_get_moneyline_history():
+    """Carrega histórico de odds de moneyline do GitHub"""
+    if not GITHUB_TOKEN:
+        return pd.DataFrame()
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/moneyline_odds_history.csv"
+        r = requests.get(url, headers={"Authorization": f"token {GITHUB_TOKEN}"}, timeout=10)
+        if r.status_code == 200:
+            content = base64.b64decode(r.json()["content"]).decode("utf-8")
+            return pd.read_csv(io.StringIO(content))
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
+
 def get_fighter_row(name):
     row = lookup[lookup["name"] == name]
     if not row.empty:
@@ -934,7 +1004,7 @@ def get_fighter_photo(name):
 
 
 
-def render_fight_card(c):
+def render_fight_card(c, odds_history=None):
     fav    = c["f1"] if c["p1"] >= c["p2"] else c["f2"]
     em, lbl, color, level = conviction_label(c["prob_fav"])
     card_class = {"high": "fight-card-high", "moderate": "fight-card-med",
@@ -1039,6 +1109,70 @@ def render_fight_card(c):
     if pm_alert_html:
         warnings_html = (pm_alert_html + " " + warnings_html).strip()
 
+    # Histórico de odds (sparkline)
+    odds_sparkline_html = ""
+    if odds_history is not None and not odds_history.empty:
+        f1_lower = c["f1"].lower()
+        f2_lower = c["f2"].lower()
+        hist = odds_history[
+            (odds_history["fighter_1"].str.lower() == f1_lower) &
+            (odds_history["fighter_2"].str.lower() == f2_lower)
+        ].sort_values("fetched_at")
+
+        if not hist.empty and len(hist) >= 2:
+            o1_vals = hist["odds_1"].tolist()
+            o2_vals = hist["odds_2"].tolist()
+            o1_open = o1_vals[0]
+            o1_curr = o1_vals[-1]
+            o2_open = o2_vals[0]
+            o2_curr = o2_vals[-1]
+            chg1 = round((o1_curr/o1_open - 1)*100, 1)
+            chg2 = round((o2_curr/o2_open - 1)*100, 1)
+            col1 = "#22c55e" if chg1 > 0 else "#e8253f"
+            col2 = "#22c55e" if chg2 > 0 else "#e8253f"
+            sign1 = "+" if chg1 > 0 else ""
+            sign2 = "+" if chg2 > 0 else ""
+
+            # Mini sparkline SVG para f1
+            def make_sparkline(vals, color):
+                if len(vals) < 2:
+                    return ""
+                mn, mx = min(vals), max(vals)
+                rng = mx - mn if mx != mn else 1
+                w, h = 60, 20
+                pts = []
+                for i, v in enumerate(vals):
+                    x = int(i / (len(vals)-1) * w)
+                    y = int(h - (v - mn) / rng * h)
+                    pts.append(f"{x},{y}")
+                polyline = " ".join(pts)
+                return (f'<svg width="{w}" height="{h}" style="vertical-align:middle;">' 
+                        f'<polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="1.5"/>' 
+                        f'</svg>')
+
+            sp1 = make_sparkline(o1_vals, col1)
+            sp2 = make_sparkline(o2_vals, col2)
+
+            odds_sparkline_html = (
+                f'<div style="display:flex; justify-content:space-between; align-items:center; '
+                f'margin-top:6px; font-size:0.75rem; color:var(--muted);">'
+                f'<div style="display:flex; align-items:center; gap:6px;">'
+                f'<span style="color:var(--text);">{c["f1"]}</span>'
+                f'<span style="color:var(--muted);">Open <strong style="color:var(--text);">{o1_open:.2f}</strong></span>'
+                f'→ <strong style="color:var(--text);">{o1_curr:.2f}</strong>'
+                f'<span style="color:{col1}; font-weight:700;">{sign1}{chg1}%</span>'
+                f'{sp1}'
+                f'</div>'
+                f'<div style="display:flex; align-items:center; gap:6px;">'
+                f'{sp2}'
+                f'<span style="color:{col2}; font-weight:700;">{sign2}{chg2}%</span>'
+                f'<strong style="color:var(--text);">{o2_curr:.2f}</strong>'
+                f'→ <span style="color:var(--muted);">Open <strong style="color:var(--text);">{o2_open:.2f}</strong></span>'
+                f'<span style="color:var(--text);">{c["f2"]}</span>'
+                f'</div>'
+                f'</div>'
+            )
+
     # Buscar fotos
     photo_f1 = get_fighter_photo(f1_name)
     photo_f2 = get_fighter_photo(f2_name)
@@ -1109,7 +1243,8 @@ def render_fight_card(c):
         f'          <span class="odds-chip">&#128202; Odds <span class="ov">{odds_f2_str}</span></span>'
         f'        </div>'
         f'      </div>'
-        f'      {f'<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">{warnings_html}</div>' if warnings_html else ''}'
+        f'      {f'<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">{warnings_html}</div>' if warnings_html else ''}
+        {odds_sparkline_html}'
         f'    </div>'
         f'    <!-- Foto F2 -->'
         f'    <div style="width:100px; display:flex; align-items:flex-end; justify-content:center;'
@@ -1183,6 +1318,7 @@ with tab1:
         eventos_ufc  = get_card_ufcstats()
         combates_api = get_upcoming_odds()
         pm_markets   = get_polymarket_odds()
+        odds_history = gh_get_moneyline_history()
 
     # Lookup de odds
     odds_lookup = {}
@@ -1221,6 +1357,7 @@ with tab1:
             if last_totals != today_str:
                 try:
                     gh_save_totals_odds()
+                    gh_save_moneyline_odds(combates_api)
                     st.session_state["last_totals_fetch"] = today_str
                 except:
                     pass
@@ -1296,7 +1433,7 @@ with tab1:
                       <div style="flex:1; height:1px; background:var(--border);"></div>
                     </div>
                     """, unsafe_allow_html=True)
-                render_fight_card(c)
+                render_fight_card(c, odds_history=odds_history)
                 # Secondary markets expander
                 prob_dec_c = c.get("prob_decision")
                 prob_o25_c = c.get("prob_over25")

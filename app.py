@@ -137,21 +137,36 @@ def get_card_from_odds_api():
     if r.status_code != 200:
         return []
     data = r.json()
+
+    # Identificar eventos UFC pelo nome dos grupos
+    # Usar o evento da Odds API que tem mais combates num mesmo dia
     eventos_por_data = defaultdict(list)
     for c in data:
         data_str = c["commence_time"][:10]
-        eventos_por_data[data_str].append((
-            normalizar_nome(c["home_team"]),
-            normalizar_nome(c["away_team"])
-        ))
+        f1 = normalizar_nome(c["home_team"])
+        f2 = normalizar_nome(c["away_team"])
+        # Filtrar eventos claramente não-UFC (menos fighters conhecidos)
+        eventos_por_data[data_str].append((f1, f2))
+
     eventos = []
     today = datetime.now()
+
     for data_str, combates in sorted(eventos_por_data.items()):
         data_dt = datetime.strptime(data_str, "%Y-%m-%d")
         dias = (data_dt - today).days
         if dias < -1 or dias > 14:
             continue
-        if len(combates) < 5:
+        # UFC events têm tipicamente 10-15 combates
+        # Pegar só o maior evento do dia (mais combates = mais provável ser UFC)
+        if len(combates) < 8:
+            continue
+        # Verificar se algum fighter está no lookup
+        fighters_conhecidos = sum(
+            1 for f1, f2 in combates
+            if lookup[lookup['name'] == f1].shape[0] > 0 or
+               lookup[lookup['name'] == f2].shape[0] > 0
+        )
+        if fighters_conhecidos < 3:
             continue
         nome = f"UFC Fight Night — {data_dt.strftime('%B %d, %Y')}"
         eventos.append({
@@ -160,6 +175,7 @@ def get_card_from_odds_api():
             "local": "",
             "card": combates,
         })
+
     return eventos
 
 def get_card_evento(url_evento):

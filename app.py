@@ -1088,6 +1088,115 @@ def get_fighter_photo(name):
 
 
 
+def sugerir_parlay(combates, threshold=0.25, max_legs=3):
+    """Sugere a melhor parlay para um evento baseada em EV positivo"""
+    candidatos = []
+    for c in combates:
+        if abs(c["prob_fav"] - 0.5) < threshold:
+            continue
+        # Fighter favorito e odds
+        if c["p1"] >= c["p2"]:
+            prob = c["p1"]
+            odds = c.get("odds_f1")
+            fighter = c["f1"]
+        else:
+            prob = c["p2"]
+            odds = c.get("odds_f2")
+            fighter = c["f2"]
+        if not odds or odds <= 1.0:
+            continue
+        ev = prob * odds - 1
+        if ev <= 0:
+            continue
+        candidatos.append({
+            "fighter": fighter,
+            "prob": prob,
+            "odds": odds,
+            "ev": ev,
+            "conf": abs(c["prob_fav"] - 0.5),
+        })
+
+    if len(candidatos) < 2:
+        return None
+
+    # Ordenar por EV e seleccionar melhores legs
+    candidatos.sort(key=lambda x: -x["ev"])
+    legs_3 = candidatos[:min(3, max_legs)]
+    legs_2 = candidatos[:2]
+
+    def calc_parlay(legs):
+        odds_total = 1.0
+        prob_total = 1.0
+        for l in legs:
+            odds_total *= l["odds"]
+            prob_total *= l["prob"]
+        ev_total = prob_total * odds_total - 1
+        return round(odds_total, 2), round(prob_total * 100, 1), round(ev_total * 100, 1)
+
+    odds_3, prob_3, ev_3 = calc_parlay(legs_3)
+    odds_2, prob_2, ev_2 = calc_parlay(legs_2)
+
+    return {
+        "legs_3": legs_3, "odds_3": odds_3, "prob_3": prob_3, "ev_3": ev_3,
+        "legs_2": legs_2, "odds_2": odds_2, "prob_2": prob_2, "ev_2": ev_2,
+    }
+
+def render_parlay(parlay, aposta=10):
+    """Renderiza a sugestão de parlay em HTML"""
+    if not parlay:
+        return ""
+
+    def render_legs(legs, odds_total, prob_total, ev_total, aposta):
+        retorno = round(aposta * (odds_total - 1), 2)
+        legs_html = ""
+        for l in legs:
+            ev_color = "#22c55e" if l["ev"] > 0.05 else "#fbbf24"
+            legs_html += (
+                f'<div style="display:flex; justify-content:space-between; '
+                f'padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05);">'
+                f'<span style="color:var(--text); font-weight:600;">{l["fighter"]}</span>'
+                f'<span style="color:var(--muted); font-size:0.8rem;">'
+                f'Odds {l["odds"]:.2f} · Prob {l["prob"]:.0%} · '
+                f'<span style="color:{ev_color};">EV {l["ev"]*100:+.1f}%</span></span>'
+                f'</div>'
+            )
+        prob_color = "#22c55e" if prob_total >= 50 else "#fbbf24"
+        return (
+            f'<div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); '
+            f'border-radius:8px; padding:12px; margin-bottom:8px;">'
+            f'<div style="display:flex; justify-content:space-between; margin-bottom:8px;">'
+            f'<span style="font-weight:700; color:var(--text);">{len(legs)}-leg Parlay</span>'
+            f'<span style="color:#a78bfa; font-weight:700;">Odds {odds_total:.2f}x</span>'
+            f'</div>'
+            f'{legs_html}'
+            f'<div style="display:flex; justify-content:space-between; margin-top:8px; '
+            f'padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">'
+            f'<span style="color:var(--muted); font-size:0.8rem;">'
+            f'Prob. ganhar: <span style="color:{prob_color}; font-weight:700;">{prob_total:.1f}%</span> · '
+            f'EV: <span style="color:#22c55e; font-weight:700;">{ev_total:+.1f}%</span></span>'
+            f'<span style="color:#22c55e; font-weight:700;">'
+            f'€{aposta} → €{retorno + aposta:.2f}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+    html_3 = render_legs(parlay["legs_3"], parlay["odds_3"], parlay["prob_3"], parlay["ev_3"], aposta) if len(parlay["legs_3"]) >= 2 else ""
+    html_2 = render_legs(parlay["legs_2"], parlay["odds_2"], parlay["prob_2"], parlay["ev_2"], aposta)
+
+    return (
+        f'<div style="margin-top:16px; padding:16px; '
+        f'background:rgba(167,139,250,0.05); '
+        f'border:1px solid rgba(167,139,250,0.2); border-radius:12px;">'
+        f'<div style="font-weight:700; color:#a78bfa; margin-bottom:12px; font-size:1rem;">'
+        f'🎯 Parlay Sugerida</div>'
+        f'{html_3}'
+        f'{"<div style=\'margin-top:8px; font-size:0.75rem; color:var(--muted);\'>Versão conservadora (2 legs):</div>" if html_3 else ""}'
+        f'{html_2 if html_3 else html_2}'
+        f'<div style="font-size:0.72rem; color:var(--muted); margin-top:8px;">'
+        f'⚠️ Apenas para fins informativos. Aposte com responsabilidade.</div>'
+        f'</div>'
+    )
+
 def render_fight_card(c, odds_history=None):
     fav    = c["f1"] if c["p1"] >= c["p2"] else c["f2"]
     em, lbl, color, level = conviction_label(c["prob_fav"])
@@ -1541,6 +1650,7 @@ with tab1:
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))
+            parlay_sugerida = sugerir_parlay(combates_proc)
 
             # Guardar previsões só para eventos de hoje ou passados
             from datetime import date

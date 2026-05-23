@@ -56,7 +56,13 @@ def load_data():
             meta_feats = pickle.load(f)
     except:
         pass
-    return models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats
+    beta_cal = None
+    try:
+        with open("beta_calibrator.pkl", "rb") as f:
+            beta_cal = pickle.load(f)
+    except:
+        pass
+    return models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal
 
 @st.cache_data(ttl=3600)
 def get_upcoming_odds():
@@ -180,7 +186,7 @@ def match_polymarket(f1_name, f2_name, pm_markets):
             return m['p2'], m['p1'], m['volume']
     return None, None, None
 
-models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats = load_data()
+models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal = load_data()
 fighter_names = sorted(lookup["name"].dropna().tolist())
 
 # ── FUNÇÕES ───────────────────────────────────────────────────────
@@ -569,7 +575,15 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
         return None
     X = build_features(r, b, odds_f1, odds_f2)
     probs = np.array([m.predict_proba(X)[0][1] for m in models.values()])
-    prob_winner = probs.mean()
+    prob_raw = probs.mean()
+    # Aplicar beta calibration se disponível
+    if beta_cal is not None:
+        try:
+            prob_winner = float(beta_cal.predict(np.array([[prob_raw]]))[0])
+        except:
+            prob_winner = prob_raw
+    else:
+        prob_winner = prob_raw
 
     # Previsões secundárias
     prob_decision, prob_over25 = None, None

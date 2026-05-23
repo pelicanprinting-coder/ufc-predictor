@@ -84,19 +84,23 @@ def get_upcoming_odds():
 
 @st.cache_data(ttl=3600)
 def get_card_ufcstats():
+    # Tentar UFCStats primeiro
     try:
         url = "http://www.ufcstats.com/statistics/events/upcoming"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
         eventos = []
-        for e in soup.find_all("tr", class_="b-statistics__table-row"):
+        rows = soup.find_all("tr")
+        for e in rows:
             link = e.find("a")
             if not link:
                 continue
             nome_evento = link.text.strip()
+            if not nome_evento or "UFC" not in nome_evento:
+                continue
             url_evento  = link["href"]
             cells       = e.find_all("td")
-            cell0_text  = cells[0].get_text(separator=" ").strip()
+            cell0_text  = cells[0].get_text(separator=" ").strip() if cells else ""
             local_str   = cells[1].text.strip() if len(cells) > 1 else ""
             match = re.search(r"([A-Z][a-z]+ \d+, \d{4})", cell0_text)
             if not match:
@@ -113,9 +117,50 @@ def get_card_ufcstats():
                     "local": local_str,
                     "card": card,
                 })
-        return eventos
+        if eventos:
+            return eventos
+    except:
+        pass
+    # Fallback: Odds API
+    try:
+        return get_card_from_odds_api()
     except:
         return []
+
+def get_card_from_odds_api():
+    from collections import defaultdict
+    r = requests.get(
+        f"https://api.the-odds-api.com/v4/sports/mma_mixed_martial_arts/odds"
+        f"?regions=eu&markets=h2h&oddsFormat=decimal&apiKey={API_KEY}",
+        timeout=10
+    )
+    if r.status_code != 200:
+        return []
+    data = r.json()
+    eventos_por_data = defaultdict(list)
+    for c in data:
+        data_str = c["commence_time"][:10]
+        eventos_por_data[data_str].append((
+            normalizar_nome(c["home_team"]),
+            normalizar_nome(c["away_team"])
+        ))
+    eventos = []
+    today = datetime.now()
+    for data_str, combates in sorted(eventos_por_data.items()):
+        data_dt = datetime.strptime(data_str, "%Y-%m-%d")
+        dias = (data_dt - today).days
+        if dias < -1 or dias > 14:
+            continue
+        if len(combates) < 5:
+            continue
+        nome = f"UFC Fight Night — {data_dt.strftime('%B %d, %Y')}"
+        eventos.append({
+            "nome": nome,
+            "data": data_dt,
+            "local": "",
+            "card": combates,
+        })
+    return eventos
 
 def get_card_evento(url_evento):
     try:

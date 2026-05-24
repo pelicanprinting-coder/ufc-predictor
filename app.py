@@ -357,7 +357,7 @@ def calc_ev(odds, prob):
         return None
 
 # ── HISTÓRICO (GitHub) ──────────────────────────────────────────
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.getenv("TOKEN_GITHUB", "")
 GITHUB_REPO  = "jdanielbcosta/ufc-predictor"
 HIST_FILE    = "historico.csv"
 

@@ -29,11 +29,25 @@ def normalizar_nome(nome):
 
 @st.cache_data
 def load_data():
-    with open("ufc_ensemble_v3.pkl", "rb") as f:
-        models = pickle.load(f)
-    with open("features_ensemble_v3.pkl", "rb") as f:
-        features = pickle.load(f)
+    # Tentar v4 (com odds movement features), fallback para v3
+    try:
+        with open("ufc_ensemble_v4.pkl", "rb") as f:
+            models = pickle.load(f)
+        with open("features_ensemble_v4.pkl", "rb") as f:
+            features = pickle.load(f)
+    except:
+        with open("ufc_ensemble_v3.pkl", "rb") as f:
+            models = pickle.load(f)
+        with open("features_ensemble_v3.pkl", "rb") as f:
+            features = pickle.load(f)
     lookup = pd.read_csv("fighter_lookup_final.csv")
+
+    # BFO movement features
+    bfo_features = None
+    try:
+        bfo_features = pd.read_csv("bfo_aligned_features.csv")
+    except:
+        pass
 
     models_dec, models_o25 = None, None
     features_dec, features_o25 = None, None
@@ -62,7 +76,7 @@ def load_data():
             beta_cal = pickle.load(f)
     except:
         pass
-    return models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal
+    return models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal, bfo_features
 
 @st.cache_data(ttl=3600)
 def get_upcoming_odds():
@@ -346,7 +360,7 @@ def match_polymarket(f1_name, f2_name, pm_markets):
             return m['p2'], m['p1'], m['volume']
     return None, None, None
 
-models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal = load_data()
+models, features, lookup, models_dec, models_o25, features_dec, features_o25, meta_model, meta_feats, beta_cal, bfo_features = load_data()
 fighter_names = sorted(lookup["name"].dropna().tolist())
 
 # ── FUNÇÕES ───────────────────────────────────────────────────────
@@ -751,6 +765,48 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
     if r is None or b is None:
         return None
     X = build_features(r, b, odds_f1, odds_f2)
+
+    # Injectar BFO movement features se disponíveis
+    if bfo_features is not None:
+        try:
+            r_lower = f1_name.lower()
+            b_lower = f2_name.lower()
+            fk = '_'.join(sorted([r_lower, b_lower]))
+            bfo_row = bfo_features[bfo_features['fight_key'] == fk]
+            if not bfo_row.empty:
+                bfo_row = bfo_row.iloc[0]
+                # Alinhar com R/B
+                if bfo_row.get('f1_lower', '') == r_lower:
+                    X['r_clv']           = bfo_row.get('f1_clv', 0) or 0
+                    X['b_clv']           = bfo_row.get('f2_clv', 0) or 0
+                    X['r_movement_pct']  = bfo_row.get('f1_movement_pct', 0) or 0
+                    X['b_movement_pct']  = bfo_row.get('f2_movement_pct', 0) or 0
+                    X['r_late']          = bfo_row.get('f1_late', 0) or 0
+                    X['b_late']          = bfo_row.get('f2_late', 0) or 0
+                    X['r_steam']         = bfo_row.get('f1_steam', 0) or 0
+                    X['b_steam']         = bfo_row.get('f2_steam', 0) or 0
+                    X['r_vol']           = bfo_row.get('f1_vol', 0) or 0
+                    X['b_vol']           = bfo_row.get('f2_vol', 0) or 0
+                else:
+                    X['r_clv']           = bfo_row.get('f2_clv', 0) or 0
+                    X['b_clv']           = bfo_row.get('f1_clv', 0) or 0
+                    X['r_movement_pct']  = bfo_row.get('f2_movement_pct', 0) or 0
+                    X['b_movement_pct']  = bfo_row.get('f1_movement_pct', 0) or 0
+                    X['r_late']          = bfo_row.get('f2_late', 0) or 0
+                    X['b_late']          = bfo_row.get('f1_late', 0) or 0
+                    X['r_steam']         = bfo_row.get('f2_steam', 0) or 0
+                    X['b_steam']         = bfo_row.get('f1_steam', 0) or 0
+                    X['r_vol']           = bfo_row.get('f2_vol', 0) or 0
+                    X['b_vol']           = bfo_row.get('f1_vol', 0) or 0
+                X['clv_diff_rb']        = X['r_clv'] - X['b_clv']
+                X['movement_diff_rb']   = X['r_movement_pct'] - X['b_movement_pct']
+                X['late_diff_rb']       = X['r_late'] - X['b_late']
+                X['steam_diff_rb']      = X['r_steam'] - X['b_steam']
+                X['vol_diff_rb']        = X['r_vol'] - X['b_vol']
+        except:
+            pass
+
+    X = X.reindex(columns=features, fill_value=0).fillna(0)
     probs = np.array([m.predict_proba(X)[0][1] for m in models.values()])
     prob_raw = probs.mean()
     # Aplicar beta calibration se disponível
@@ -819,7 +875,7 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
                 'odds_prob': odds_prob,
                 'ensemble_vs_odds': ensemble_vs_odds,
                 'rest_diff': 0,
-                'clv_diff': 0,
+                'clv_diff': float(X.get('clv_diff_rb', 0) or 0),
                 'odds_magnitude': abs(odds_prob),
             }])[meta_feats]
             meta_score = float(meta_model.predict_proba(meta_X)[0][1])

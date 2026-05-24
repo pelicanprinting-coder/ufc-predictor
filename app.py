@@ -369,6 +369,23 @@ def calc_ev(odds, prob):
     except:
         return None
 
+
+def calc_kelly(odds, prob, fraction=0.25):
+    """Kelly Criterion (fractional) — % do bankroll a apostar"""
+    try:
+        odds = float(odds)
+        prob = float(prob)
+        if odds <= 1.0 or prob <= 0 or prob >= 1:
+            return None
+        b = odds - 1
+        q = 1 - prob
+        kelly = (prob * b - q) / b
+        if kelly <= 0:
+            return None
+        return round(kelly * fraction, 4)  # Quarter Kelly por defeito
+    except:
+        return None
+
 # ── HISTÓRICO (GitHub) ──────────────────────────────────────────
 GITHUB_TOKEN = os.getenv("TOKEN_GITHUB", "")
 GITHUB_REPO  = "jdanielbcosta/ufc-predictor"
@@ -1399,14 +1416,26 @@ def render_fight_card(c, odds_history=None):
     ev_f2_html = ""
     if c["odds_f1"] and c["p1"]:
         ev = calc_ev(c["odds_f1"], c["p1"])
+        kelly = calc_kelly(c["odds_f1"], c["p1"])
+        ev_parts = []
         if ev is not None:
             cls = "edge-pos" if ev > 0.05 else ("edge-neg" if ev < -0.05 else "edge-neu")
-            ev_f1_html = f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>'
+            ev_parts.append(f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>')
+        if kelly is not None:
+            cls = "edge-pos" if kelly >= 0.02 else "edge-neu"
+            ev_parts.append(f'<span class="{cls}" style="font-size:0.72rem;">Kelly {kelly*100:.1f}%</span>')
+        ev_f1_html = " ".join(ev_parts)
     if c["odds_f2"] and c["p2"]:
         ev = calc_ev(c["odds_f2"], c["p2"])
+        kelly = calc_kelly(c["odds_f2"], c["p2"])
+        ev_parts = []
         if ev is not None:
             cls = "edge-pos" if ev > 0.05 else ("edge-neg" if ev < -0.05 else "edge-neu")
-            ev_f2_html = f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>'
+            ev_parts.append(f'<span class="{cls}" style="font-size:0.72rem;">EV {ev*100:+.1f}%</span>')
+        if kelly is not None:
+            cls = "edge-pos" if kelly >= 0.02 else "edge-neu"
+            ev_parts.append(f'<span class="{cls}" style="font-size:0.72rem;">Kelly {kelly*100:.1f}%</span>')
+        ev_f2_html = " ".join(ev_parts)
 
     # Odds strings
     odds_f1_str = f"{c['odds_f1']:.2f}" if c["odds_f1"] else "—"
@@ -2169,7 +2198,7 @@ with tab3:
     if hist.empty:
         st.info("No prediction history yet. Predictions are saved automatically when you load the Upcoming Events tab.")
     else:
-        total = len(hist)
+        total = len(com_resultado)
         com_resultado = hist[hist["correct"].isin(["✅","❌"])]
         corretos = (com_resultado["correct"] == "✅").sum()
         acc = corretos / len(com_resultado) if len(com_resultado) > 0 else 0

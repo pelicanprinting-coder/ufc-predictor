@@ -149,8 +149,21 @@ def get_card_ufc_com():
         if not card:
             return []
 
-        # Nome do evento
-        nome_evento = next_event_nome or f"UFC Fight Night — {data_dt.strftime('%B %d, %Y')}"
+        # Nome do evento — procurar texto curto que seja o nome real
+        nome_evento = None
+        for l in event_links:
+            txt = l.text.strip()
+            href = l.get('href', '')
+            if next_event_url.endswith(href) or href in next_event_url:
+                # Preferir textos curtos como "Song vs Figueiredo"
+                if txt and 'vs' in txt.lower() and len(txt) < 50:
+                    nome_evento = f"UFC Fight Night: {txt}"
+                    break
+        if not nome_evento:
+            # Extrair do URL: /event/ufc-fight-night-may-30-2026 → UFC Fight Night May 30 2026
+            slug = next_event_url.split('/event/')[-1]
+            parts = slug.replace('-', ' ').title()
+            nome_evento = parts
 
         return [{
             "nome": nome_evento,

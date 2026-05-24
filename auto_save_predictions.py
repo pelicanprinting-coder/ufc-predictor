@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.getenv("TOKEN_GITHUB", "")
 GITHUB_REPO  = os.getenv("GITHUB_REPO", "jdanielbcosta/ufc-predictor")
 API_KEY      = os.getenv("ODDS_API_KEY", "97d30892355e2d15de1257c0aa526a50")
 HIST_FILE    = "historico.csv"

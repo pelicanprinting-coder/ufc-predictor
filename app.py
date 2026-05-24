@@ -83,8 +83,94 @@ def get_upcoming_odds():
         return []
 
 @st.cache_data(ttl=3600)
+def get_card_ufc_com():
+    """Scraper do UFC.com para obter o card do próximo evento"""
+    try:
+        # Encontrar o próximo evento UFC
+        r = requests.get(
+            "https://www.ufc.com/events",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=10
+        )
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # Encontrar link do próximo evento
+        event_links = soup.find_all('a', href=lambda x: x and '/event/' in str(x))
+        next_event_url = None
+        next_event_nome = None
+
+        for l in event_links:
+            href = l.get('href', '')
+            if '/event/' in href and 'ufc' in href.lower():
+                if href.startswith('/'):
+                    href = 'https://www.ufc.com' + href
+                next_event_url = href
+                next_event_nome = l.text.strip()
+                break
+
+        if not next_event_url:
+            return []
+
+        # Aceder à página do evento
+        r2 = requests.get(
+            next_event_url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=10
+        )
+        soup2 = BeautifulSoup(r2.text, 'html.parser')
+
+        # Extrair data
+        import re
+        date_match = re.search(r'(\w+ \d+, \d{4})', r2.text)
+        data_dt = datetime.strptime(date_match.group(1), "%B %d, %Y") if date_match else datetime.now()
+
+        # Extrair local
+        local_str = ""
+        local_tag = soup2.find('div', class_=lambda x: x and 'location' in str(x).lower())
+        if local_tag:
+            local_str = local_tag.text.strip()
+
+        # Extrair fighters
+        fighter_links = soup2.find_all('a', href=lambda x: x and '/athlete/' in str(x))
+        fighters_clean = []
+        seen_hrefs = set()
+        for l in fighter_links:
+            href = l.get('href', '')
+            name = ' '.join(l.text.strip().split())
+            if not name or href in seen_hrefs:
+                continue
+            seen_hrefs.add(href)
+            fighters_clean.append(name)
+
+        # Criar pares
+        card = [(fighters_clean[i], fighters_clean[i+1]) 
+                for i in range(0, len(fighters_clean)-1, 2)]
+
+        if not card:
+            return []
+
+        # Nome do evento
+        nome_evento = next_event_nome or f"UFC Fight Night — {data_dt.strftime('%B %d, %Y')}"
+
+        return [{
+            "nome": nome_evento,
+            "data": data_dt,
+            "local": local_str,
+            "card": card,
+        }]
+    except Exception as e:
+        return []
+
 def get_card_ufcstats():
-    # Tentar UFCStats primeiro
+    # Tentar UFC.com primeiro (mais fiável)
+    try:
+        eventos = get_card_ufc_com()
+        if eventos:
+            return eventos
+    except:
+        pass
+
+    # Tentar UFCStats
     try:
         url = "http://www.ufcstats.com/statistics/events/upcoming"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)

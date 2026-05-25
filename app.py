@@ -882,7 +882,10 @@ def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
         except:
             pass
 
-    return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25, meta_score
+    # Ensemble disagreement
+    ensemble_std = float(np.std(probs)) if len(probs) > 1 else None
+
+    return prob_winner, 1 - prob_winner, r, b, prob_decision, prob_over25, meta_score, ensemble_std
 
 def conviction_label(prob):
     if prob >= 0.75: return 0, "HIGH CONVICTION 83%", "#D4AF37", "high"
@@ -1435,6 +1438,18 @@ def render_fight_card(c, odds_history=None):
     em, lbl, color, level = conviction_label(c["prob_fav"])
     meta_score = c.get("meta_score")
     meta_html = ""
+    # Consensus badge — baixo disagreement + alta confiança
+    consensus_html = ""
+    ensemble_std = c.get("ensemble_std")
+    if ensemble_std is not None and ensemble_std <= 0.04 and c["prob_fav"] >= 0.65:
+        consensus_html = (
+            f'<span style="background:rgba(96,165,250,0.15); color:#60a5fa; '
+            f'border:1px solid rgba(96,165,250,0.4); border-radius:4px; '
+            f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+            f'letter-spacing:0.05em;">'
+            f'🤝 CONSENSUS {(1-ensemble_std/0.04)*100:.0f}%'
+            f'</span>'
+        )
     if meta_score is not None and meta_score >= 0.75:
         meta_html = (
             f'<span style="background:rgba(34,197,94,0.15); color:#22c55e; '
@@ -1531,6 +1546,8 @@ def render_fight_card(c, odds_history=None):
                         'padding:2px 8px; font-size:0.72rem; font-weight:700; '
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
     warnings_html = " ".join(warnings)
+    if consensus_html:
+        warnings_html = (consensus_html + " " + warnings_html).strip()
 
     # Bookmaker disagreement
     disagreement = c.get("disagreement")
@@ -1869,12 +1886,12 @@ with tab1:
                 if res is None:
                     res = prever(f2_ufc, f1_ufc, odds_f2, odds_f1)
                     if res is not None:
-                        p2, p1, _, _, _, _, _ = res
+                        p2, p1, _, _, _, _, _, ens_std = res
                     else:
                         sem_dados.append(f"{f1_ufc} vs {f2_ufc}")
                         continue
                 else:
-                    p1, p2, _, _, _, _, _ = res
+                    p1, p2, _, _, _, _, _, ens_std = res
 
                 prob_fav = max(p1, p2)
                 pm_p1, pm_p2, pm_vol = match_polymarket(f1_ufc, f2_ufc, pm_markets)
@@ -1892,6 +1909,7 @@ with tab1:
                     "pm_p1": pm_p1, "pm_p2": pm_p2, "pm_vol": pm_vol,
                     "disagreement": disagreement,
                     "meta_score": res[6] if len(res) > 6 else None,
+                    "ensemble_std": res[7] if len(res) > 7 else None,
                 })
 
             combates_proc.sort(key=lambda x: (x["ordem"], -x["prob_fav"]))
@@ -2030,7 +2048,7 @@ with tab2:
             if res is None:
                 st.error("❌ Insufficient data for one or both fighters.")
             else:
-                prob_r, prob_b, red, blue, prob_decision, prob_over25, meta_score = res
+                prob_r, prob_b, red, blue, prob_decision, prob_over25, meta_score, ens_std = res
                 winner  = red_name if prob_r > prob_b else blue_name
                 w_corner = "🔴" if prob_r > prob_b else "🔵"
                 em, lbl, color, level = conviction_label(max(prob_r, prob_b))

@@ -1545,6 +1545,21 @@ def render_fight_card(c, odds_history=None):
                         'border:1px solid rgba(255,165,0,0.3); border-radius:4px; '
                         'padding:2px 8px; font-size:0.72rem; font-weight:700; '
                         'letter-spacing:0.05em;">⏱️ 5 ROUNDS — model less reliable (62%)</span>')
+    # Late movement warning — mercado a apostar contra o favorito
+    prob_fav_c = c.get("prob_fav", 0.5)
+    fav_is_red_c = prob_fav_c == c.get("p1", 0)
+    r_late_c = c.get("r_late", 0) or 0
+    b_late_c = c.get("b_late", 0) or 0
+    fav_late_c = r_late_c if (c.get("p1", 0) >= c.get("p2", 0)) else -r_late_c
+    if fav_late_c > 0.05:
+        warnings.append(
+            f'<span style="background:rgba(232,37,63,0.15); color:#e8253f; '
+            f'border:1px solid rgba(232,37,63,0.4); border-radius:4px; '
+            f'padding:2px 8px; font-size:0.72rem; font-weight:700; '
+            f'letter-spacing:0.05em;">'
+            f'⚠️ MARKET BETTING AGAINST FAVOURITE'
+            f'</span>'
+        )
     warnings_html = " ".join(warnings)
     if consensus_html:
         warnings_html = (consensus_html + " " + warnings_html).strip()

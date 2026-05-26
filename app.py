@@ -31,9 +31,9 @@ def normalizar_nome(nome):
 def load_data():
     # Tentar v4 (com odds movement features), fallback para v3
     try:
-        with open("ufc_ensemble_v4.pkl", "rb") as f:
+        with open("ufc_ensemble_v5.pkl", "rb") as f:
             models = pickle.load(f)
-        with open("features_ensemble_v4.pkl", "rb") as f:
+        with open("features_ensemble_v5.pkl", "rb") as f:
             features = pickle.load(f)
     except:
         with open("ufc_ensemble_v3.pkl", "rb") as f:
@@ -753,6 +753,25 @@ def build_features(r, b, r_odds=None, b_odds=None):
     r_rest = float(r.get("dias_inativo", 180) or 180)
     b_rest = float(b.get("dias_inativo", 180) or 180)
     feats["rest_diff"] = r_rest - b_rest
+
+    # ufc_age_diff: anos de carreira na UFC
+    r_ufc_debut = r.get("ufc_debut")
+    b_ufc_debut = b.get("ufc_debut")
+    try:
+        if r_ufc_debut and b_ufc_debut:
+            import datetime
+            today = datetime.date.today()
+            r_ufc_age = (today - pd.to_datetime(r_ufc_debut).date()).days / 365.25
+            b_ufc_age = (today - pd.to_datetime(b_ufc_debut).date()).days / 365.25
+            feats["ufc_age_diff"] = r_ufc_age - b_ufc_age
+        else:
+            feats["ufc_age_diff"] = 0.0
+    except:
+        feats["ufc_age_diff"] = 0.0
+
+    # win_rate features
+    feats["win_rate_l5_diff"] = sd("win_rate_l5")
+    feats["win_rate_l3_diff"] = sd("win_rate_l3")
 
     return pd.DataFrame([feats])[features].fillna(0)
 
@@ -1785,7 +1804,7 @@ st.markdown("""
   </div>
 </div>
 <div style="margin: 10px 0 22px;">
-  <span class="badge-stat">🎯 Accuracy <span>68.55%</span></span>
+  <span class="badge-stat">🎯 Accuracy <span>69.82%</span></span>
   <span class="badge-stat">🤖 Models <span>5 ensemble</span></span>
   <span class="badge-stat">⚡ High Conviction <span>83.5% acc</span></span>
   <span class="badge-stat">🎯 Moderate <span>79.3% acc</span></span>

@@ -29,7 +29,7 @@ def normalizar_nome(nome):
 
 @st.cache_data
 def load_data():
-    # Tentar v4 (com odds movement features), fallback para v3
+    # Tentar v5 (ufc_age + win_rate + odds movement), fallback para v3
     try:
         with open("ufc_ensemble_v5.pkl", "rb") as f:
             models = pickle.load(f)

@@ -13,7 +13,7 @@
   .badge { display: inline-block; margin-top: 18px; padding: 8px 14px; border: 1px solid #2a2f36; border-radius: 999px; font-size: 13px; color: #d0d4da; }
   .spinner { width: 28px; height: 28px; border: 3px solid #2a2f36; border-top-color: #ff3b30;
     border-radius: 50%; animation: spin 1s linear infinite; margin: 22px auto 0; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #d0d4da; }
 </style>
 </head>
 <body>
@@ -23,17 +23,22 @@
       <p>Ensemble ML model — 68.45% accuracy on unseen 2023–2026 UFC fights.</p>
       <p>Starting up the Streamlit server…</p>
       <div class="spinner"></div>
-      <div class="badge">This may take 20–40 seconds on cold start</div>
+      <div class="badge">This may take 20–90 seconds on cold start</div>
+      <p style="margin-top:22px;font-size:13px;">
+        Stuck? <a href="/port/5000/">Open the app directly</a>
+      </p>
     </div>
   </div>
   <script>
-    // Wait for Streamlit backend to be reachable, then swap this static page for it.
     (function () {
       var tries = 0;
       function ping() {
         tries++;
-        fetch('/_stcore/health', { cache: 'no-store' })
-          .then(function (r) { if (r.ok) window.location.replace('/'); else retry(); })
+        fetch('/port/5000/_stcore/health', { cache: 'no-store' })
+          .then(function (r) {
+            if (r.ok) window.location.replace('/port/5000/');
+            else retry();
+          })
           .catch(retry);
       }
       function retry() { if (tries < 120) setTimeout(ping, 2000); }

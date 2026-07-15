@@ -1,6 +1,7 @@
 [server]
 headless = true
 address = "0.0.0.0"
+baseUrlPath = "port/5000"
 enableCORS = false
 enableXsrfProtection = false
 enableWebsocketCompression = false

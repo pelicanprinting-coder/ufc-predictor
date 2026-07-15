@@ -14,7 +14,7 @@ import base64
 import io
 from dotenv import load_dotenv
 load_dotenv()
-API_KEY = os.getenv("ODDS_API_KEY", "97d30892355e2d15de1257c0aa526a50")
+API_KEY = os.getenv("ODDS_API_KEY", "")
 
 NOME_MAP = {
     "Paulo Henrique Costa": "Paulo Costa",
@@ -1793,6 +1793,8 @@ def render_fight_card(c, odds_history=None):
 
 # ── INIT ──────────────────────────────────────────────────────────
 st.set_page_config(page_title="UFC Fight Predictor", page_icon="🥊", layout="wide")
+if not API_KEY:
+    st.warning("ODDS_API_KEY is not set. Live odds features will be unavailable.")
 inject_css()
 
 # ── HEADER ────────────────────────────────────────────────────────

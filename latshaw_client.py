@@ -56,6 +56,18 @@ def _load_all():
     return welcome, fo, sos, strk, wr
 
 
+@lru_cache(maxsize=1)
+def _load_dk():
+    """Load the Daily Fantasy Sports → DraftKings Table from Latshaw.
+    Missing file returns an empty DataFrame (DK columns become manual)."""
+    path = os.path.join(_DATA_DIR, "latshaw_draftkings.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    df = pd.read_csv(path)
+    df["_name_key"] = df["Name"].astype(str).str.lower().str.strip()
+    return df
+
+
 def event_names() -> list[str]:
     """Return list of distinct event names in the Latshaw data (usually the
     next 1-2 upcoming UFC events)."""
@@ -129,6 +141,7 @@ def get_row(name: str) -> Optional[dict]:
     Missing values are None. Returns None if fighter not on the card.
     """
     welcome, fo, sos, strk, wr = _load_all()
+    dk = _load_dk()
     key = name.lower().strip()
 
     fo_m = fo[fo["_name_key"] == key]
@@ -142,6 +155,7 @@ def get_row(name: str) -> Optional[dict]:
     sos_r = sos[sos["_name_key"] == key].iloc[0] if not sos[sos["_name_key"] == key].empty else None
     strk_r = strk[strk["_name_key"] == key].iloc[0] if not strk[strk["_name_key"] == key].empty else None
     wr_r = wr[wr["_name_key"] == key].iloc[0] if not wr[wr["_name_key"] == key].empty else None
+    dk_r = dk[dk["_name_key"] == key].iloc[0] if (not dk.empty and not dk[dk["_name_key"] == key].empty) else None
 
     row: dict = dict(wel)  # start with welcome fields
 
@@ -177,9 +191,15 @@ def get_row(name: str) -> Optional[dict]:
         dist_slpm = _num(strk_r["DISTANCE SIGNIFICANT STRIKES (PER MINUTE AT DISTANCE)_Landed"])
         dist_sapm = _num(strk_r["DISTANCE SIGNIFICANT STRIKES (PER MINUTE AT DISTANCE)_Absorbed"])
         row["head_strike_landed_pct"] = _pct(strk_r["HEAD SIGNIFICANT STRIKES_% of Strikes Landed"])
-        row["head_absorption_pct"] = _pct(strk_r["HEAD SIGNIFICANT STRIKES_% of Strikes Absorbed"])
+        row["head_strike_absorbed_pct"] = _pct(strk_r["HEAD SIGNIFICANT STRIKES_% of Strikes Absorbed"])
+        row["head_absorption_pct"] = row["head_strike_absorbed_pct"]
         row["kd_rate"] = _pct(strk_r["KNOCKDOWNS_Land Rate"])
         row["kd_absorbed_rate"] = _pct(strk_r["KNOCKDOWNS_Concede Rate"])
+        # Per Scott's column mapping, sig_strike_accuracy_pct = Significant Strike Accuracy
+        # and sig_strike_defense_pct = Significant Strike Defense.
+        # Latshaw exposes these under DISTANCE STRIKING EFFICIENCY (distance-only).
+        row["sig_strike_accuracy_pct"] = _pct(strk_r["DISTANCE STRIKING EFFICIENCY_Accuracy"])
+        row["sig_strike_defense_pct"] = _pct(strk_r["DISTANCE STRIKING EFFICIENCY_Defense"])
 
         # Reconstruct overall SLpM/SApM/Diff by combining distance + clinch/ground shares
         if wr_r is not None:
@@ -194,15 +214,15 @@ def get_row(name: str) -> Optional[dict]:
     # ------- Wrestling/Grappling table -------
     if wr_r is not None:
         row["td_defense_pct"] = _pct(wr_r["TAKEDOWN EFFICIENCY_Defense"])
-        # APEX td_per_15 uses the distance-time denominator (TDs are attempted
-        # from distance), matching UFCStats' Td.Avg style: landed / (mins × dist%) × 15.
+        # Per Scott's column mapping: td_per_15 = "Takedowns Landed per 5 Minutes at
+        # Distance × 3" — i.e. TAKEDOWN PACE (PER 5 MINUTES AT DISTANCE)_Landed × 3.
+        # This is mathematically identical to landed / (mins × dist%) × 15, since
+        # Latshaw's per-5-min-at-distance number already normalizes for distance time.
         # Verified vs APEX-ENGINE.csv: DP 3.16 vs 3.18, Cannonier 0.70 vs 0.69,
         # Usman 5.36 vs 5.34 (rounding within ±0.02).
-        td_landed = _num(wr_r["TAKEDOWN EFFICIENCY_Landed"])
-        mins = _num(wr_r["WRESTLING/GRAPPLING PREVALENCE & EFFICIENCY_Fight Minutes"])
-        dist_pct_wr = _pct(wr_r["WRESTLING/GRAPPLING PREVALENCE & EFFICIENCY_Distance %"])
-        if td_landed is not None and mins and mins > 0 and dist_pct_wr:
-            row["td_per_15"] = round(td_landed / (mins * dist_pct_wr / 100) * 15, 2)
+        td_per_5_dist = _num(wr_r["TAKEDOWN PACE (PER 5 MINUTES AT DISTANCE)_Landed"])
+        if td_per_5_dist is not None:
+            row["td_per_15"] = round(td_per_5_dist * 3, 2)
         # Control time per 15 = control% × 15 (share of fight time is spent controlling)
         ctrl_pct = _pct(wr_r["WRESTLING/GRAPPLING PREVALENCE & EFFICIENCY_Control %"])
         if ctrl_pct is not None:
@@ -217,6 +237,29 @@ def get_row(name: str) -> Optional[dict]:
         sub_success = _pct(wr_r["SUBMISSION ATTEMPTS_Success Rate"])
         if sub_success is not None:
             row["sub_attempt_success_rate"] = sub_success / 100
+
+    # ------- DraftKings table (Daily Fantasy Sports tab) -------
+    # Per Scott's mapping:
+    #   dk_win_avg  ← "Avg DraftKings Points Earned in UFC Wins - Total"
+    #   dk_loss_avg ← "Avg DraftKings Points Conceded in UFC Losses - Total"
+    #   avg_dk_pts  ← weighted mean across the fighter's UFC wins & losses
+    if dk_r is not None:
+        dk_win_col = "Avg DK Points Earned in UFC Wins - Total DraftKings Points"
+        dk_loss_col = "Avg DK Points Conceded in UFC Losses - Total DraftKings Points"
+        win_avg = _num(dk_r[dk_win_col]) if dk_win_col in dk_r.index else None
+        loss_avg = _num(dk_r[dk_loss_col]) if dk_loss_col in dk_r.index else None
+        row["dk_win_avg"] = win_avg
+        row["dk_loss_avg"] = loss_avg
+        # avg_dk_pts weighted by UFC wins vs losses count
+        w = row.get("ufc_wins") or 0
+        l = row.get("ufc_losses") or 0
+        if (w or l):
+            if win_avg is not None and loss_avg is not None:
+                row["avg_dk_pts"] = round((win_avg * w + loss_avg * l) / (w + l), 1)
+            elif win_avg is not None and w:
+                row["avg_dk_pts"] = round(win_avg, 1)
+            elif loss_avg is not None and l:
+                row["avg_dk_pts"] = round(loss_avg, 1)
 
     return row
 

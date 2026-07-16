@@ -50,6 +50,73 @@ APEX_COLUMNS = [
 ]
 
 
+# Columns explicitly marked "Manually Loaded" in docs/apex_column_mapping.csv —
+# these are the ONLY columns that should be highlighted yellow in the preview.
+MANUAL_ONLY_COLUMNS = {
+    "Event", "fight_pair", "short_notice", "dk_salary", "champ_experience",
+    "Missed_weight", "Long_layoff", "Elo_pct_secondary",
+    "GPT", "SIM", "MMA-AI", "CAPPERS", "GROK", "CLAUDE", "GEMINI",
+    "CHAT GPT", "DEEP SEEK", "AI-AVERAGE", "MODEL 75", "NEW MODEL",
+    "SCRAP", "CAGE SCORE", "CAGE PICKS", "ELO/IMPLIED", "CI LOW", "CI HIGH",
+}
+
+
+# --- Tapology / UFCStats / OpticOdds data loaders --------------------
+
+@st.cache_data(show_spinner=False)
+def _load_tapology() -> pd.DataFrame:
+    """Career totals (KO/sub wins & losses, pro record, total fights)."""
+    path = os.path.join(os.path.dirname(__file__),
+                        "data", "tapology", "career_totals.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+@st.cache_data(show_spinner=False)
+def _load_recent_fights() -> pd.DataFrame:
+    """Last 3 UFCStats results + methods."""
+    path = os.path.join(os.path.dirname(__file__),
+                        "data", "ufcstats", "recent_fights.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+@st.cache_data(show_spinner=False)
+def _load_card_odds() -> pd.DataFrame:
+    """OpticOdds open + current + method-of-victory prices."""
+    path = os.path.join(os.path.dirname(__file__),
+                        "data", "opticodds", "card_odds.csv")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+def _norm(name: str) -> str:
+    if not isinstance(name, str):
+        return ""
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def _lookup(df: pd.DataFrame, name: str, col: str = "name") -> dict | None:
+    if df is None or df.empty or not name:
+        return None
+    target = _norm(name)
+    if col not in df.columns:
+        return None
+    norm_series = df[col].astype(str).map(_norm)
+    m = df[norm_series == target]
+    if not m.empty:
+        return m.iloc[0].to_dict()
+    # Last-name / suffix fallback
+    last = target[-6:] if len(target) > 6 else target
+    m = df[norm_series.str.endswith(last)]
+    if not m.empty:
+        return m.iloc[0].to_dict()
+    return None
+
+
 # --- FM ELO lookup ----------------------------------------------------
 
 @st.cache_data(show_spinner=False)
@@ -148,6 +215,9 @@ def build_row(
     scheduled_rounds: int,
     open_odds: int | None = None,
     current_odds: int | None = None,
+    tap: dict | None = None,
+    recent: dict | None = None,
+    odds_row: dict | None = None,
 ) -> dict:
     """
     Assemble one APEX row for a fighter using Latshaw + FM data.
@@ -209,6 +279,84 @@ def build_row(
     kd_rate_fmt = _pct_str(g("kd_rate"), decimals=1)
     kd_abs_fmt = _pct_str(g("kd_absorbed_rate"), decimals=1)
 
+    # --- Tapology-derived career totals ------------------------------
+    def t(key, default=None):
+        if not tap:
+            return default
+        v = tap.get(key)
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return default
+        return v
+
+    career_ko_wins = t("ko_wins")
+    career_sub_wins = t("sub_wins")
+    career_ko_losses = t("ko_losses")
+    career_sub_losses = t("sub_losses")
+    total_fights = t("total_fights")
+    pro_record = t("pro_record") or g("pro_record")
+
+    # sub_win_pct = career_sub_wins / Total Fights  (per Blank-13 mapping)
+    sub_win_pct_val = None
+    if career_sub_wins is not None and total_fights not in (None, 0):
+        try:
+            sub_win_pct_val = round(float(career_sub_wins) / float(total_fights), 4)
+        except Exception:
+            sub_win_pct_val = None
+
+    # finish_rate = (career_ko_wins + career_sub_wins) / Total Fights
+    finish_rate_val = t("finish_rate")
+    if finish_rate_val is None and total_fights not in (None, 0):
+        ko = career_ko_wins or 0
+        sub = career_sub_wins or 0
+        try:
+            finish_rate_val = round((float(ko) + float(sub)) / float(total_fights), 4)
+        except Exception:
+            finish_rate_val = None
+
+    # --- UFCStats recent fights --------------------------------------
+    def r(key):
+        if not recent:
+            return None
+        v = recent.get(key)
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        return v
+
+    # --- OpticOdds row -----------------------------------------------
+    def o(key):
+        if not odds_row:
+            return None
+        v = odds_row.get(key)
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        return v
+
+    open_ml = o("ml_open_dk")
+    if open_ml is None:
+        open_ml = open_odds
+    current_ml = o("ml_current")
+    if current_ml is None:
+        current_ml = current_odds
+    # ml_win_by_* are stored as implied probabilities in card_odds.csv.
+    # APEX-ENGINE.csv holds them as American odds — convert so the column
+    # is drop-in comparable with the existing Google Sheet.
+    ml_ko = o("ml_win_by_ko")
+    ml_sub = o("ml_win_by_sub")
+    ml_dec = o("ml_win_by_dec")
+
+    def _prob_to_american(p):
+        if p is None or (isinstance(p, float) and pd.isna(p)):
+            return None
+        try:
+            p = float(p)
+            if p <= 0 or p >= 1:
+                return None
+            if p >= 0.5:
+                return f"-{int(round(p / (1 - p) * 100))}"
+            return f"+{int(round((1 - p) / p * 100))}"
+        except Exception:
+            return None
+
     row = {
         "Event": event_name,
         "fight_pair": fight_pair_idx,
@@ -222,14 +370,14 @@ def build_row(
         "reach": reach_fmt,
         "height": height_fmt,
         "stance": g("stance"),
-        "pro_record": g("pro_record"),
+        "pro_record": pro_record,
         "ufc_record": ufc_record,
         "ufc_fight_count": g("ufc_fight_count"),
-        # Career finish counts — Latshaw doesn't expose full pro career; manual
-        "career_ko_wins": None,
-        "career_sub_wins": None,
-        "career_ko_losses": None,
-        "career_sub_losses": None,
+        # Career finish counts — from Tapology
+        "career_ko_wins": career_ko_wins,
+        "career_sub_wins": career_sub_wins,
+        "career_ko_losses": career_ko_losses,
+        "career_sub_losses": career_sub_losses,
         "slpm": g("slpm"),
         "sig_strike_diff": g("sig_strike_diff"),
         "kd_rate": kd_rate_fmt,
@@ -238,32 +386,32 @@ def build_row(
         "head_absorption_pct": head_absorbed_fmt,
         "td_per_15": g("td_per_15"),
         "ctrl_time_per_15": g("ctrl_time_per_15"),
-        "sub_win_pct": g("sub_win_pct"),
+        "sub_win_pct": sub_win_pct_val,
         "ufc_minutes_fought": g("ufc_minutes_fought"),
         "td_defense_pct": td_def_fmt,
         "ctrl_absorbed_per_15": g("ctrl_absorbed_per_15"),
-        # Recent fight results — Latshaw doesn't expose per-fight list; manual
-        "recent_fight_1_result": None,
-        "recent_fight_1_method": None,
-        "recent_fight_2_result": None,
-        "recent_fight_2_method": None,
-        "recent_fight_3_result": None,
-        "recent_fight_3_method": None,
+        # Recent fight results — from UFCStats
+        "recent_fight_1_result": r("recent_fight_1_result"),
+        "recent_fight_1_method": r("recent_fight_1_method"),
+        "recent_fight_2_result": r("recent_fight_2_result"),
+        "recent_fight_2_method": r("recent_fight_2_method"),
+        "recent_fight_3_result": r("recent_fight_3_result"),
+        "recent_fight_3_method": r("recent_fight_3_method"),
         "opp_ufc_win_pct": opp_ufc_win_pct,
         "opp_xr_pct": opp_xr_pct,
         "xr_pct": xr_pct,
-        "finish_rate": None,  # needs career KO+SUB / total fights
+        "finish_rate": finish_rate_val,
         "elo": elo,
-        "OPEN": _american(open_odds),
-        "CURRENT": _american(current_odds),
-        "ml_win_by_ko": None,
-        "ml_win_by_sub": None,
-        "ml_win_by_dec": None,
-        "avg_dk_pts": None,
-        "dk_win_avg": None,
-        "dk_loss_avg": None,
+        "OPEN": _american(open_ml),
+        "CURRENT": _american(current_ml),
+        "ml_win_by_ko": _prob_to_american(ml_ko),
+        "ml_win_by_sub": _prob_to_american(ml_sub),
+        "ml_win_by_dec": _prob_to_american(ml_dec),
+        "avg_dk_pts": g("avg_dk_pts"),
+        "dk_win_avg": g("dk_win_avg"),
+        "dk_loss_avg": g("dk_loss_avg"),
         "champ_experience": 0,  # default
-        "Total Fights": None,  # career total; Latshaw doesn't expose
+        "Total Fights": total_fights,
         "head_strike_landed_pct": head_landed_fmt,
         "head_strike_absorbed_pct": head_absorbed_fmt,
         "Missed_weight": 0,
@@ -276,10 +424,10 @@ def build_row(
         "CAGE SCORE": None, "CAGE PICKS": None,
         "ELO/IMPLIED": None, "CI LOW": None, "CI HIGH": None,
         "RESULTS": "PENDING",
-        # Latshaw distance-only accuracy/defense doesn't match APEX overall
-        # definition (differs by ~5pp). Leave manual so Scott's numbers stay clean.
-        "sig_strike_accuracy_pct": None,
-        "sig_strike_defense_pct": None,
+        # Per Scott's column mapping, sig_strike_accuracy_pct / defense_pct come
+        # from Latshaw's Significant Strike Accuracy / Defense (distance-only).
+        "sig_strike_accuracy_pct": _pct_str(g("sig_strike_accuracy_pct")),
+        "sig_strike_defense_pct": _pct_str(g("sig_strike_defense_pct")),
     }
     return row
 
@@ -316,16 +464,20 @@ def _open_current_from_snapshot(snap, fighter_a: str, fighter_b: str):
 # --- Streamlit tab ----------------------------------------------------
 
 def render_card_prep_page():
-    st.header("Card Prep — Auto-fill APEX rows from Latshaw")
+    st.header("Card Prep — Auto-fill APEX rows")
     st.caption(
-        "Pulls fighter data straight from Nate Latshaw's UFC Fight Night "
-        "Statistical Companion snapshot. Yellow cells still need manual "
-        "collection (career finish counts, DK salary, market odds, model "
-        "outputs, recent-fight history)."
+        "Pulls fighter data from four sources: Nate Latshaw's Statistical "
+        "Companion (fighter stats), Tapology (career finish totals), UFCStats "
+        "(recent-fight history), and OpticOdds (open/current ML + method-of-"
+        "victory prices). Yellow cells are the columns you still fill in "
+        "manually (DK salary, model outputs, judgement flags)."
     )
 
     fm_df = _load_fm_ratings()
     snap = _load_snapshot()
+    tap_df = _load_tapology()
+    recent_df = _load_recent_fights()
+    card_odds_df = _load_card_odds()
 
     # --- Event selector -----------------------------------------------
     try:
@@ -383,13 +535,21 @@ def render_card_prep_page():
             lat_b = L.get_row(b)
             fm_a = _fm_lookup(fm_df, a)
             fm_b = _fm_lookup(fm_df, b)
+            tap_a = _lookup(tap_df, a)
+            tap_b = _lookup(tap_df, b)
+            recent_a = _lookup(recent_df, a)
+            recent_b = _lookup(recent_df, b)
+            odds_a = _lookup(card_odds_df, a)
+            odds_b = _lookup(card_odds_df, b)
 
             _, current_a, _, current_b = _open_current_from_snapshot(snap, a, b)
 
             row_a = build_row(selected_event, i + 1, lat_a, lat_b, fm_a,
-                              a, b, rounds, open_odds=None, current_odds=current_a)
+                              a, b, rounds, open_odds=None, current_odds=current_a,
+                              tap=tap_a, recent=recent_a, odds_row=odds_a)
             row_b = build_row(selected_event, i + 1, lat_b, lat_a, fm_b,
-                              b, a, rounds, open_odds=None, current_odds=current_b)
+                              b, a, rounds, open_odds=None, current_odds=current_b,
+                              tap=tap_b, recent=recent_b, odds_row=odds_b)
             rows.append(row_a)
             rows.append(row_b)
             missing_by_fighter[a] = lat_a is None
@@ -413,11 +573,14 @@ def render_card_prep_page():
         c3.metric("Not in Latshaw", len(not_found),
                   help=", ".join(not_found) if not_found else "All matched")
 
-        def _style_missing(val):
-            if val is None or (isinstance(val, float) and np.isnan(val)):
-                return "background-color: #fff9b0; color: #333;"
-            return ""
-        styled = df.style.map(_style_missing)
+        # Yellow-highlight ONLY the columns explicitly marked "Manually Loaded"
+        # in docs/apex_column_mapping.csv — not every missing value.
+        def _style_manual_col(col):
+            if col.name in MANUAL_ONLY_COLUMNS:
+                return ["background-color: #fff9b0; color: #333;"] * len(col)
+            return [""] * len(col)
+
+        styled = df.style.apply(_style_manual_col, axis=0)
         st.markdown("### 📋 Preview (yellow = needs manual fill)")
         st.dataframe(styled, use_container_width=True, hide_index=True)
 

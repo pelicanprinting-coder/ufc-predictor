@@ -1,0 +1,23 @@
+Order,Event,Name,MMA Record,UFC Record,Fight Minutes,Avg DK Points Earned in UFC Wins - Total DraftKings Points,Avg DK Points Earned in UFC Wins - Distance Striking,Avg DK Points Earned in UFC Wins - Wrestling/Grappling,Avg DK Points Earned in UFC Wins - Win Bonus,Avg DK Points Conceded in UFC Losses - Total DraftKings Points,Avg DK Points Conceded in UFC Losses - Distance Striking,Avg DK Points Conceded in UFC Losses - Wrestling/Grappling,Avg DK Points Conceded in UFC Losses - Win Bonus,% DK Points Earned in UFC Wins - Distance Striking,% DK Points Earned in UFC Wins - Wrestling/Grappling,% DK Points Earned in UFC Wins - Win Bonus,% DK Points Conceded in UFC Losses - Distance Striking,% DK Points Conceded in UFC Losses - Wrestling/Grappling,% DK Points Conceded in UFC Losses - Win Bonus,DK Points Earned per 15 Min in UFC Wins - Distance Striking,DK Points Earned per 15 Min in UFC Wins - Wrestling/Grappling,DK Points Conceded per 15 Min in UFC Losses - Distance Striking,DK Points Conceded per 15 Min in UFC Losses - Wrestling/Grappling
+01a,UFC FN: Du Plessis vs. Usman,Dricus Du Plessis,23-3-0,9-1-0,149,108,34,21,53,242,103,109,30,31%,20%,49%,43%,45%,12%,37,23,62,65
+01b,UFC FN: Du Plessis vs. Usman,Kamaru Usman,21-4-0,16-3-0,339,121,35,45,40,85,32,20,33,29%,37%,33%,38%,23%,39%,31,39,23,14
+02a,UFC FN: Du Plessis vs. Usman,Jared Cannonier,18-9-0,11-9-0,278,98,32,12,54,88,31,12,44,33%,12%,55%,36%,14%,51%,36,13,32,12
+02b,UFC FN: Du Plessis vs. Usman,Christian Leroy Duncan,14-2-0,7-2-0,90,96,21,11,64,85,27,29,30,22%,11%,67%,31%,34%,35%,36,19,27,29
+03a,UFC FN: Du Plessis vs. Usman,Chase Hooper,16-5-1,8-5-0,115,112,19,32,61,104,27,11,66,17%,29%,55%,26%,11%,64%,30,51,51,21
+03b,UFC FN: Du Plessis vs. Usman,Mitch Ramirez,8-3-0,0-2-0,19,,,,,103,26,20,58,,,,25%,19%,56%,,,40,30
+04a,UFC FN: Du Plessis vs. Usman,Tabatha Ricci,12-4-0,7-4-0,143,98,25,31,41,89,33,17,40,26%,32%,42%,37%,19%,45%,29,36,37,19
+04b,UFC FN: Du Plessis vs. Usman,Fatima Kline,9-1-0,3-1-0,52,108,28,32,48,91,21,39,30,26%,30%,45%,24%,43%,33%,33,39,21,39
+05a,UFC FN: Du Plessis vs. Usman,Tommy McMillen,10-0-0,1-0-0,4,130,35,5,90,,,,,27%,4%,69%,,,,134,19,,
+05b,UFC FN: Du Plessis vs. Usman,Alberto Montes,12-1-0,1-0-0,6,85,12,3,70,,,,,14%,4%,83%,,,,31,8,,
+06a,UFC FN: Du Plessis vs. Usman,Austin Bashi,14-1-0,1-1-0,19,110,10,10,90,76,15,31,30,9%,9%,82%,20%,41%,40%,41,42,15,31
+06b,UFC FN: Du Plessis vs. Usman,Jose Delgado,11-2-0,3-1-0,33,104,21,5,78,92,46,16,30,20%,5%,75%,50%,18%,33%,51,13,46,16
+07a,UFC FN: Du Plessis vs. Usman,Jean-Paul Lebosnoyani,10-2-0,1-0-0,15,85,22,32,30,,,,,27%,38%,35%,,,,22,32,,
+07b,UFC FN: Du Plessis vs. Usman,Seokhyeon Ko,13-2-0,2-0-0,30,103,19,55,30,,,,,18%,53%,29%,,,,19,55,,
+08a,UFC FN: Du Plessis vs. Usman,Levi Rodrigues Jr.,5-0-0,0-0-0,,,,,,,,,,,,,,,,,,,
+08b,UFC FN: Du Plessis vs. Usman,Felipe Franco,10-2-0,0-1-0,15,,,,,85,29,27,30,,,,33%,31%,35%,,,29,27
+09a,UFC FN: Du Plessis vs. Usman,Alden Coria,12-3-0,2-0-0,26,84,25,21,38,,,,,30%,26%,45%,,,,29,25,,
+09b,UFC FN: Du Plessis vs. Usman,Stewart Nicoll,8-3-0,0-3-0,28,,,,,100,24,12,63,,,,24%,12%,64%,,,39,20
+10a,UFC FN: Du Plessis vs. Usman,RJ Harris,5-0-0,0-0-0,,,,,,,,,,,,,,,,,,,
+10b,UFC FN: Du Plessis vs. Usman,Alvin Hines,7-1-0,0-1-0,15,,,,,75,44,0,30,,,,59%,1%,40%,,,44,0
+11a,UFC FN: Du Plessis vs. Usman,Anna Melisano,6-1-0,0-0-0,,,,,,,,,,,,,,,,,,,
+11b,UFC FN: Du Plessis vs. Usman,Dione Barbosa,9-4-0,3-2-0,64,92,19,23,50,74,23,22,30,21%,25%,55%,30%,29%,40%,25,30,23,22

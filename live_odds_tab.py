@@ -30,6 +30,7 @@ from edge_math import (
     format_american,
     no_vig_two_way,
 )
+from fightmatrix_math import build_fm_comparison, three_way_consensus
 
 
 def _fmt_prob(p: float) -> str:
@@ -64,6 +65,32 @@ def _lookup_fighter_row(lookup: pd.DataFrame, name: str) -> pd.Series | None:
         matches = lookup[lookup["fighter_name"].str.lower().str.endswith(" " + last)]
     if matches.empty:
         return None
+    return matches.iloc[0]
+
+
+@st.cache_data(show_spinner=False)
+def _load_fm_lookup() -> pd.DataFrame | None:
+    """Load fighter_lookup_apex_v2_with_fm.csv if present."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "fighter_lookup_apex_v2_with_fm.csv")
+    if not os.path.exists(path):
+        return None
+    return pd.read_csv(path, low_memory=False)
+
+
+def _lookup_fm_row(fm_lookup: pd.DataFrame, name: str) -> pd.Series | None:
+    if fm_lookup is None or fm_lookup.empty:
+        return None
+    # Take the most recent entry for that fighter (has FM columns)
+    name_norm = name.strip().lower()
+    matches = fm_lookup[fm_lookup["fighter_name"].str.lower() == name_norm]
+    if matches.empty:
+        last = name_norm.split()[-1] if name_norm else ""
+        matches = fm_lookup[fm_lookup["fighter_name"].str.lower().str.endswith(" " + last)]
+    if matches.empty:
+        return None
+    # Prefer rows that have FM data populated
+    matches = matches.sort_values("fm_blended", na_position="last")
     return matches.iloc[0]
 
 
@@ -277,6 +304,16 @@ def render_live_odds_page():
                     f"{fighter_b} → **{pred.get('b_archetype', '?')}**"
                 )
 
+                # --- Fight Matrix consensus panel -------------------------
+                fm_lookup = _load_fm_lookup()
+                if fm_lookup is not None:
+                    fm_row_a = _lookup_fm_row(fm_lookup, fighter_a)
+                    fm_row_b = _lookup_fm_row(fm_lookup, fighter_b)
+                    comp = build_fm_comparison(fighter_a, fighter_b, fm_row_a, fm_row_b)
+                    if comp is not None:
+                        with st.expander("Fight Matrix Consensus (2nd opinion)", expanded=True):
+                            _render_fm_panel(comp, model_p_a, ml_snap.consensus_a, fighter_a, fighter_b)
+
                 # Deep links
                 if pick and ml_snap:
                     best = ml_snap.best_a if pick.fighter == fighter_a else ml_snap.best_b
@@ -289,7 +326,76 @@ def render_live_odds_page():
                 st.error(f"Edge computation failed: {e}")
                 st.exception(e)
 
-    # --- Method of Victory (informational) --------------------------------
+    # --- Method of Victory + Total Rounds (informational) -----------------
+    _continue_odds_page(odds_rows, fighter_a, fighter_b)
+
+
+def _render_fm_panel(comp, model_prob_a: float, market_prob_a: float,
+                     fighter_a: str, fighter_b: str) -> None:
+    """Render the Fight Matrix consensus expander block."""
+    # Header rating table
+    st.caption(
+        f"Ratings from [fightmatrix.com]({comp.fm_profile_a or 'https://www.fightmatrix.com/'}) — "
+        f"user blend: **0.45·Glicko-1 + 0.55·WHR**"
+    )
+    rows = []
+    for label, key in [("Glicko-1", "glicko1"), ("WHR", "whr"), ("Elo K170", "k170")]:
+        ra = comp.ratings_a.get(key)
+        rb = comp.ratings_b.get(key)
+        if ra is None or rb is None:
+            continue
+        pa, pb = comp.system_probs.get(key, (None, None))
+        rows.append({
+            "System": label,
+            f"{fighter_a}": f"{ra:.0f}",
+            f"{fighter_b}": f"{rb:.0f}",
+            "Diff": f"{ra - rb:+.0f}",
+            f"P({fighter_a})": f"{pa*100:.1f}%" if pa is not None else "—",
+        })
+    if comp.blended_rating_a is not None:
+        rows.append({
+            "System": "Blended (0.45G+0.55W)",
+            f"{fighter_a}": f"{comp.blended_rating_a:.1f}",
+            f"{fighter_b}": f"{comp.blended_rating_b:.1f}",
+            "Diff": f"{comp.blended_rating_a - comp.blended_rating_b:+.1f}",
+            f"P({fighter_a})": f"{comp.blended_prob_a*100:.1f}%",
+        })
+    df = pd.DataFrame(rows)
+    st.dataframe(df, hide_index=True, use_container_width=True)
+
+    # Three-way comparison metric row
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Market (no-vig)", f"{market_prob_a*100:.1f}% / {(1-market_prob_a)*100:.1f}%",
+              help=f"Market implied for {fighter_a} / {fighter_b}")
+    m2.metric("V2 Model", f"{model_prob_a*100:.1f}% / {(1-model_prob_a)*100:.1f}%",
+              help="V2 ensemble prediction")
+    if comp.blended_prob_a == comp.blended_prob_a:  # not NaN
+        m3.metric("FM Blend", f"{comp.blended_prob_a*100:.1f}% / {(1-comp.blended_prob_a)*100:.1f}%",
+                  help="0.45·Glicko-1 + 0.55·WHR blend")
+    m4.metric("Systems verdict", comp.consensus_verdict,
+              help=f"Largest disagreement across FM systems: {comp.largest_disagreement*100:.1f}%")
+
+    # Three-way consensus banner
+    if comp.blended_prob_a == comp.blended_prob_a:
+        label = three_way_consensus(model_prob_a, comp.blended_prob_a, market_prob_a)
+        banner_cfg = {
+            "STRONG_CONSENSUS": ("#0e4d29", "🎯", f"STRONG CONSENSUS — V2 + FM Blend agree against the market"),
+            "WEAK_CONSENSUS": ("#3b2f10", "🟡", f"WEAK CONSENSUS — V2 + FM Blend agree against the market, small edge"),
+            "SPLIT": ("#3b1010", "⚠️", "SPLIT — V2 Model and FM Blend disagree on the pick"),
+            "MARKET_ALIGNED": ("#1e2a3a", "➖", "Market-aligned — model and FM blend agree with the market"),
+            "NEUTRAL": ("#2b2b2b", "⚪", "Neutral"),
+            "INCOMPLETE": ("#2b2b2b", "⚪", "Insufficient data"),
+        }[label]
+        color, icon, msg = banner_cfg
+        st.markdown(
+            f"<div style='background:{color}; padding:12px 16px; border-radius:6px; margin-top:8px;'>"
+            f"<span style='font-size:1.05em; font-weight:600;'>{icon} {msg}</span></div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _continue_odds_page(odds_rows, fighter_a: str, fighter_b: str):
+    """Method of Victory + Total Rounds informational panels."""
     method_rows = [r for r in odds_rows if r.market == "Method of Victory"]
     if method_rows:
         st.markdown("### Method of Victory")

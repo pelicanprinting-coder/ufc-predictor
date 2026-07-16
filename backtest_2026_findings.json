@@ -1,0 +1,331 @@
+{
+  "overall": {
+    "slice": "overall",
+    "n": 200,
+    "acc": 0.6,
+    "avg_conf": 0.5995,
+    "brier_proxy": 0.2307
+  },
+  "by_confidence": [
+    {
+      "slice": "high (>=70%)",
+      "n": 22,
+      "acc": 0.8182,
+      "avg_conf": 0.7458,
+      "brier_proxy": 0.1612
+    },
+    {
+      "slice": "med (60-70%)",
+      "n": 67,
+      "acc": 0.6716,
+      "avg_conf": 0.6456,
+      "brier_proxy": 0.2207
+    },
+    {
+      "slice": "lean (55-60%)",
+      "n": 40,
+      "acc": 0.575,
+      "avg_conf": 0.5771,
+      "brier_proxy": 0.2442
+    },
+    {
+      "slice": "tossup (50-55%)",
+      "n": 71,
+      "acc": 0.4789,
+      "avg_conf": 0.5234,
+      "brier_proxy": 0.2541
+    }
+  ],
+  "by_weight_class": [
+    {
+      "slice": "Road to 4 Bantamweight Tournament",
+      "n": 1,
+      "acc": 0.0,
+      "avg_conf": 0.6117,
+      "brier_proxy": 0.3742
+    },
+    {
+      "slice": "Lightweight",
+      "n": 25,
+      "acc": 0.32,
+      "avg_conf": 0.6196,
+      "brier_proxy": 0.3102
+    },
+    {
+      "slice": "Catch Weight",
+      "n": 2,
+      "acc": 0.5,
+      "avg_conf": 0.5241,
+      "brier_proxy": 0.2732
+    },
+    {
+      "slice": "Featherweight",
+      "n": 26,
+      "acc": 0.5769,
+      "avg_conf": 0.5974,
+      "brier_proxy": 0.2306
+    },
+    {
+      "slice": "Bantamweight",
+      "n": 25,
+      "acc": 0.6,
+      "avg_conf": 0.6192,
+      "brier_proxy": 0.2099
+    },
+    {
+      "slice": "Heavyweight",
+      "n": 15,
+      "acc": 0.6,
+      "avg_conf": 0.5784,
+      "brier_proxy": 0.2337
+    },
+    {
+      "slice": "Light Heavyweight",
+      "n": 11,
+      "acc": 0.6364,
+      "avg_conf": 0.5954,
+      "brier_proxy": 0.2419
+    },
+    {
+      "slice": "Middleweight",
+      "n": 28,
+      "acc": 0.6429,
+      "avg_conf": 0.6136,
+      "brier_proxy": 0.2131
+    },
+    {
+      "slice": "Women's Strawweight",
+      "n": 12,
+      "acc": 0.6667,
+      "avg_conf": 0.5713,
+      "brier_proxy": 0.2183
+    },
+    {
+      "slice": "Women's Flyweight",
+      "n": 9,
+      "acc": 0.6667,
+      "avg_conf": 0.5893,
+      "brier_proxy": 0.235
+    },
+    {
+      "slice": "Welterweight",
+      "n": 26,
+      "acc": 0.6923,
+      "avg_conf": 0.5921,
+      "brier_proxy": 0.1941
+    },
+    {
+      "slice": "Flyweight",
+      "n": 10,
+      "acc": 0.7,
+      "avg_conf": 0.5806,
+      "brier_proxy": 0.2438
+    },
+    {
+      "slice": "Women's Bantamweight",
+      "n": 9,
+      "acc": 0.7778,
+      "avg_conf": 0.6016,
+      "brier_proxy": 0.1869
+    },
+    {
+      "slice": "Road to 4 Featherweight Tournament",
+      "n": 1,
+      "acc": 1.0,
+      "avg_conf": 0.5615,
+      "brier_proxy": 0.1923
+    }
+  ],
+  "title_bouts": {
+    "slice": "title bouts",
+    "n": 7,
+    "acc": 0.4286,
+    "avg_conf": 0.6117,
+    "brier_proxy": 0.3303
+  },
+  "main_events": {
+    "slice": "main events",
+    "n": 18,
+    "acc": 0.5556,
+    "avg_conf": 0.6173,
+    "brier_proxy": 0.2505
+  },
+  "prelims": {
+    "slice": "prelims+non-main",
+    "n": 182,
+    "acc": 0.6044,
+    "avg_conf": 0.5978,
+    "brier_proxy": 0.2287
+  },
+  "short_notice_involved": {
+    "slice": "short-notice involved",
+    "n": 0,
+    "acc": null,
+    "avg_conf": null
+  },
+  "no_short_notice": {
+    "slice": "no short-notice",
+    "n": 200,
+    "acc": 0.6,
+    "avg_conf": 0.5995,
+    "brier_proxy": 0.2307
+  },
+  "long_layoff_involved": {
+    "slice": "long-layoff involved",
+    "n": 11,
+    "acc": 0.7273,
+    "avg_conf": 0.6067,
+    "brier_proxy": 0.1902
+  },
+  "no_long_layoff": {
+    "slice": "no long-layoff",
+    "n": 189,
+    "acc": 0.5926,
+    "avg_conf": 0.5991,
+    "brier_proxy": 0.2331
+  },
+  "age_gap_5plus": {
+    "slice": "age gap >=5y",
+    "n": 70,
+    "acc": 0.6143,
+    "avg_conf": 0.6238,
+    "brier_proxy": 0.2174
+  },
+  "age_gap_lt5": {
+    "slice": "age gap <5y",
+    "n": 130,
+    "acc": 0.5923,
+    "avg_conf": 0.5864,
+    "brier_proxy": 0.2379
+  },
+  "rookie_involved": {
+    "slice": "rookie (<=3 UFC fights)",
+    "n": 107,
+    "acc": 0.5981,
+    "avg_conf": 0.6023,
+    "brier_proxy": 0.2264
+  },
+  "experienced_only": {
+    "slice": "both experienced",
+    "n": 93,
+    "acc": 0.6022,
+    "avg_conf": 0.5963,
+    "brier_proxy": 0.2357
+  },
+  "by_archetype_pair": [
+    {
+      "slice": "Counter Striker vs Volume Striker",
+      "n": 6,
+      "acc": 0.3333,
+      "avg_conf": 0.5891,
+      "brier_proxy": 0.2996
+    },
+    {
+      "slice": "Point Fighter vs Point Fighter",
+      "n": 20,
+      "acc": 0.45,
+      "avg_conf": 0.5655,
+      "brier_proxy": 0.2539
+    },
+    {
+      "slice": "Volume Striker vs Wrestler",
+      "n": 20,
+      "acc": 0.5,
+      "avg_conf": 0.5846,
+      "brier_proxy": 0.2384
+    },
+    {
+      "slice": "Point Fighter vs Wrestler",
+      "n": 9,
+      "acc": 0.5556,
+      "avg_conf": 0.6403,
+      "brier_proxy": 0.2078
+    },
+    {
+      "slice": "Point Fighter vs Volume Striker",
+      "n": 44,
+      "acc": 0.6136,
+      "avg_conf": 0.5973,
+      "brier_proxy": 0.2356
+    },
+    {
+      "slice": "Volume Striker vs Volume Striker",
+      "n": 50,
+      "acc": 0.64,
+      "avg_conf": 0.6035,
+      "brier_proxy": 0.2221
+    },
+    {
+      "slice": "Sub Specialist vs Volume Striker",
+      "n": 28,
+      "acc": 0.6429,
+      "avg_conf": 0.6047,
+      "brier_proxy": 0.2332
+    },
+    {
+      "slice": "Point Fighter vs Sub Specialist",
+      "n": 11,
+      "acc": 0.7273,
+      "avg_conf": 0.6146,
+      "brier_proxy": 0.2283
+    }
+  ],
+  "fighter_off_loss_involved": {
+    "slice": "fighter off recent loss",
+    "n": 125,
+    "acc": 0.608,
+    "avg_conf": 0.6021,
+    "brier_proxy": 0.2289
+  },
+  "calibration": [
+    {
+      "bin": "(0.499, 0.55]",
+      "n": 71,
+      "avg_predicted": 0.5234,
+      "empirical_acc": 0.4789,
+      "gap": 0.0445
+    },
+    {
+      "bin": "(0.55, 0.6]",
+      "n": 40,
+      "avg_predicted": 0.5771,
+      "empirical_acc": 0.575,
+      "gap": 0.0021
+    },
+    {
+      "bin": "(0.6, 0.65]",
+      "n": 40,
+      "avg_predicted": 0.6243,
+      "empirical_acc": 0.7,
+      "gap": -0.0757
+    },
+    {
+      "bin": "(0.65, 0.7]",
+      "n": 27,
+      "avg_predicted": 0.6771,
+      "empirical_acc": 0.6296,
+      "gap": 0.0475
+    },
+    {
+      "bin": "(0.7, 0.75]",
+      "n": 13,
+      "avg_predicted": 0.7235,
+      "empirical_acc": 0.9231,
+      "gap": -0.1996
+    },
+    {
+      "bin": "(0.75, 0.8]",
+      "n": 7,
+      "avg_predicted": 0.7706,
+      "empirical_acc": 0.7143,
+      "gap": 0.0564
+    },
+    {
+      "bin": "(0.8, 1.0]",
+      "n": 2,
+      "avg_predicted": 0.8042,
+      "empirical_acc": 0.5,
+      "gap": 0.3042
+    }
+  ]
+}

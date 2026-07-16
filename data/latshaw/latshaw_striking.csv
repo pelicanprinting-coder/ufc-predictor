@@ -1,0 +1,43 @@
+Order,Event,Name,MMA Record,UFC Record,DISTANCE STRIKING PREVALENCE_Fight Minutes,DISTANCE STRIKING PREVALENCE_% of Time,DISTANCE STRIKING PREVALENCE_% of Strikes,DISTANCE SIGNIFICANT STRIKES (PER MINUTE AT DISTANCE)_Landed,DISTANCE SIGNIFICANT STRIKES (PER MINUTE AT DISTANCE)_Absorbed,DISTANCE SIGNIFICANT STRIKES (PER MINUTE AT DISTANCE)_Differential,DISTANCE STRIKING EFFICIENCY_Accuracy,DISTANCE STRIKING EFFICIENCY_Defense,KNOCKDOWNS_Landed,KNOCKDOWNS_Land Rate,KNOCKDOWNS_Conceded,KNOCKDOWNS_Concede Rate,HEAD SIGNIFICANT STRIKES_% of Strikes Landed,HEAD SIGNIFICANT STRIKES_Accuracy,HEAD SIGNIFICANT STRIKES_% of Strikes Absorbed,HEAD SIGNIFICANT STRIKES_Defense,BODY SIGNIFICANT STRIKES_% of Strikes Landed,BODY SIGNIFICANT STRIKES_Accuracy,BODY SIGNIFICANT STRIKES_% of Strikes Absorbed,BODY SIGNIFICANT STRIKES_Defense,LEG SIGNIFICANT STRIKES_% of Strikes Landed,LEG SIGNIFICANT STRIKES_Accuracy,LEG SIGNIFICANT STRIKES_% of Strikes Absorbed,LEG SIGNIFICANT STRIKES_Defense
+01a,UFC FN: Du Plessis vs. Usman,Dricus Du Plessis,23-3-0,9-1-0,149,70%,82%,6.1,5.6,0.5,46%,55%,4,0.8%,0,0.0%,59%,39%,75%,58%,18%,77%,17%,28%,23%,77%,8%,8%
+01b,UFC FN: Du Plessis vs. Usman,Kamaru Usman,21-4-0,16-3-0,339,52%,57%,4.6,4.2,0.4,42%,59%,10,1.1%,1,0.1%,64%,43%,55%,67%,29%,79%,26%,20%,8%,87%,18%,10%
+02a,UFC FN: Du Plessis vs. Usman,Jared Cannonier,18-9-0,11-9-0,278,77%,81%,4.7,5.1,-0.4,46%,58%,7,0.8%,8,0.8%,63%,41%,69%,64%,20%,74%,18%,30%,17%,81%,13%,12%
+02b,UFC FN: Du Plessis vs. Usman,Christian Leroy Duncan,14-2-0,7-2-0,90,51%,76%,6.6,4.1,2.5,54%,56%,3,1.3%,0,0.0%,49%,46%,53%,64%,15%,63%,20%,29%,36%,86%,27%,20%
+03a,UFC FN: Du Plessis vs. Usman,Chase Hooper,16-5-1,8-5-0,115,44%,61%,6.1,5.0,1.1,40%,47%,1,0.3%,6,2.5%,71%,41%,72%,47%,19%,74%,14%,19%,11%,83%,14%,9%
+03b,UFC FN: Du Plessis vs. Usman,Mitch Ramirez,8-3-0,0-2-0,19,41%,88%,7.4,7.6,-0.3,39%,41%,0,0.0%,2,4.2%,46%,26%,54%,49%,19%,76%,25%,25%,34%,92%,21%,6%
+04a,UFC FN: Du Plessis vs. Usman,Tabatha Ricci,12-4-0,7-4-0,143,66%,80%,4.9,6.4,-1.5,33%,60%,0,0.0%,1,0.2%,66%,30%,65%,66%,13%,60%,24%,33%,21%,73%,12%,18%
+04b,UFC FN: Du Plessis vs. Usman,Fatima Kline,9-1-0,3-1-0,52,53%,69%,6.5,4.2,2.3,44%,61%,1,0.5%,0,0.0%,73%,45%,58%,66%,21%,76%,28%,38%,6%,71%,14%,26%
+05a,UFC FN: Du Plessis vs. Usman,Tommy McMillen,10-0-0,1-0-0,4,91%,84%,17.2,5.3,11.9,55%,66%,1,1.4%,0,0.0%,69%,52%,70%,71%,31%,64%,30%,50%,0%,,0%,100%
+05b,UFC FN: Du Plessis vs. Usman,Alberto Montes,12-1-0,1-0-0,6,60%,81%,7.6,5.9,1.8,50%,66%,0,0.0%,0,0.0%,59%,45%,64%,73%,31%,77%,14%,25%,9%,100%,23%,0%
+06a,UFC FN: Du Plessis vs. Usman,Austin Bashi,14-1-0,1-1-0,19,36%,76%,2.8,4.8,-1.9,39%,55%,0,0.0%,0,0.0%,56%,34%,73%,56%,36%,82%,27%,20%,8%,40%,0%,
+06b,UFC FN: Du Plessis vs. Usman,Jose Delgado,11-2-0,3-1-0,33,85%,78%,7.1,5.6,1.5,53%,52%,3,1.5%,1,0.8%,58%,48%,68%,57%,30%,75%,11%,25%,12%,89%,22%,31%
+07a,UFC FN: Du Plessis vs. Usman,Jean-Paul Lebosnoyani,10-2-0,1-0-0,15,63%,71%,5.0,5.3,-0.3,54%,53%,0,0.0%,0,0.0%,61%,52%,78%,55%,15%,59%,6%,50%,24%,94%,17%,18%
+07b,UFC FN: Du Plessis vs. Usman,Seokhyeon Ko,13-2-0,2-0-0,30,16%,38%,5.5,2.7,2.7,54%,65%,0,0.0%,0,0.0%,75%,62%,29%,84%,7%,83%,50%,22%,17%,92%,21%,25%
+08a,UFC FN: Du Plessis vs. Usman,Levi Rodrigues Jr.,5-0-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+08b,UFC FN: Du Plessis vs. Usman,Felipe Franco,10-2-0,0-1-0,15,58%,62%,1.5,2.3,-0.8,25%,52%,0,0.0%,0,0.0%,62%,25%,74%,48%,33%,88%,18%,14%,5%,100%,9%,0%
+09a,UFC FN: Du Plessis vs. Usman,Alden Coria,12-3-0,2-0-0,26,70%,82%,5.5,3.2,2.3,41%,71%,0,0.0%,0,0.0%,71%,39%,63%,75%,13%,55%,15%,59%,16%,100%,23%,44%
+09b,UFC FN: Du Plessis vs. Usman,Stewart Nicoll,8-3-0,0-3-0,28,76%,94%,4.5,6.9,-2.4,39%,51%,0,0.0%,1,0.7%,71%,33%,68%,57%,16%,76%,25%,18%,13%,87%,6%,29%
+10a,UFC FN: Du Plessis vs. Usman,RJ Harris,5-0-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+10b,UFC FN: Du Plessis vs. Usman,Alvin Hines,7-1-0,0-1-0,15,99%,98%,5.4,7.4,-2.1,31%,38%,0,0.0%,0,0.0%,68%,25%,84%,41%,26%,72%,3%,57%,6%,83%,13%,0%
+11a,UFC FN: Du Plessis vs. Usman,Anna Melisano,6-1-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+11b,UFC FN: Du Plessis vs. Usman,Dione Barbosa,9-4-0,3-2-0,64,44%,80%,4.2,4.9,-0.7,41%,66%,0,0.0%,0,0.0%,63%,36%,49%,75%,28%,76%,24%,49%,9%,88%,27%,25%
+12a,UFC FN: Ankalaev vs. Rountree Jr,Magomed Ankalaev,21-2-1,12-2-1,189,69%,71%,3.8,3.2,0.5,47%,59%,7,1.6%,1,0.4%,56%,42%,31%,77%,27%,74%,23%,40%,17%,91%,46%,16%
+12b,UFC FN: Ankalaev vs. Rountree Jr,Khalil Rountree Jr.,15-7-0,10-7-0,175,88%,91%,4.0,4.4,-0.4,39%,51%,14,2.7%,3,0.5%,55%,29%,58%,60%,24%,73%,22%,23%,21%,82%,20%,17%
+13a,UFC FN: Ankalaev vs. Rountree Jr,Steve Erceg,14-4-0,5-3-0,120,76%,89%,5.4,4.6,0.8,45%,58%,1,0.2%,2,0.6%,74%,42%,58%,65%,18%,70%,20%,37%,8%,88%,22%,14%
+13b,UFC FN: Ankalaev vs. Rountree Jr,Ramazan Temirov,19-3-0,2-0-0,18,90%,85%,4.1,3.1,1.0,39%,66%,3,4.1%,0,0.0%,77%,37%,41%,75%,22%,57%,34%,27%,1%,100%,24%,26%
+14a,UFC FN: Ankalaev vs. Rountree Jr,Islam Dulatov,12-1-0,1-0-0,4,75%,76%,5.2,4.2,1.0,46%,43%,1,5.9%,0,0.0%,81%,46%,36%,69%,14%,100%,14%,50%,5%,100%,50%,0%
+14b,UFC FN: Ankalaev vs. Rountree Jr,Wellington Turman,18-8-0,3-6-0,97,44%,76%,5.6,6.1,-0.6,46%,53%,0,0.0%,1,0.4%,59%,42%,67%,53%,21%,64%,22%,25%,21%,88%,11%,2%
+15a,UFC FN: Ankalaev vs. Rountree Jr,Magomed Zaynukov,8-0-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+15b,UFC FN: Ankalaev vs. Rountree Jr,Damian Rzepecki,10-0-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+16a,UFC FN: Ankalaev vs. Rountree Jr,Rizvan Kuniev,13-3-1,1-1-0,30,54%,65%,3.5,4.1,-0.6,36%,52%,0,0.0%,0,0.0%,78%,39%,59%,58%,17%,75%,17%,21%,5%,100%,24%,5%
+16b,UFC FN: Ankalaev vs. Rountree Jr,Tyrell Fortune,18-3-0,1-0-0,15,61%,60%,2.0,3.9,-2.0,42%,63%,0,0.0%,0,0.0%,80%,45%,47%,71%,20%,100%,43%,26%,0%,,11%,17%
+17a,UFC FN: Ankalaev vs. Rountree Jr,Valter Walker,15-1-0,4-1-0,24,41%,70%,3.4,6.6,-3.1,49%,43%,0,0.0%,0,0.0%,51%,38%,49%,59%,17%,80%,25%,15%,32%,94%,25%,0%
+17b,UFC FN: Ankalaev vs. Rountree Jr,Thomas Petersen,11-4-0,3-3-0,74,57%,75%,4.0,3.9,0.1,56%,59%,1,0.6%,3,1.8%,64%,49%,68%,62%,27%,85%,25%,34%,8%,100%,7%,13%
+18a,UFC FN: Ankalaev vs. Rountree Jr,Uran Satybaldiev,9-1-0,1-1-0,18,61%,89%,3.1,5.2,-2.0,23%,46%,1,3.8%,0,0.0%,53%,16%,46%,60%,16%,60%,9%,33%,32%,75%,45%,15%
+18b,UFC FN: Ankalaev vs. Rountree Jr,Dustin Jacoby,22-9-1,10-6-1,166,81%,89%,6.0,4.5,1.5,45%,60%,7,1.0%,6,1.1%,68%,39%,69%,65%,14%,70%,13%,32%,18%,85%,18%,13%
+19a,UFC FN: Ankalaev vs. Rountree Jr,Ismael Bonfim,20-6-0,2-3-0,42,73%,90%,6.8,4.6,2.2,53%,60%,1,0.5%,0,0.0%,64%,45%,49%,67%,21%,84%,24%,40%,15%,92%,27%,30%
+19b,UFC FN: Ankalaev vs. Rountree Jr,Axel Sola,11-1-1,1-1-0,27,80%,88%,4.5,4.9,-0.4,44%,66%,1,0.9%,0,0.0%,81%,42%,72%,68%,19%,70%,24%,20%,0%,,3%,17%
+20a,UFC FN: Ankalaev vs. Rountree Jr,Magomed Tuchalov,6-0-0,0-0-0,,,,,,,,,,,,,,,,,,,,,,,,
+20b,UFC FN: Ankalaev vs. Rountree Jr,Brendson Ribeiro,17-10-0,2-5-0,49,61%,97%,4.1,4.4,-0.2,42%,56%,1,1.0%,2,2.0%,53%,31%,53%,62%,22%,66%,27%,32%,25%,68%,19%,22%
+21a,UFC FN: Ankalaev vs. Rountree Jr,Nurullo Aliev,11-0-0,3-0-0,45,44%,67%,3.5,3.6,-0.1,39%,60%,0,0.0%,0,0.0%,81%,39%,45%,72%,14%,71%,27%,46%,5%,56%,28%,15%
+21b,UFC FN: Ankalaev vs. Rountree Jr,Mike Davis,12-3-0,5-2-0,85,54%,74%,6.3,7.5,-1.2,50%,59%,4,1.4%,0,0.0%,64%,48%,61%,66%,27%,71%,17%,27%,9%,77%,22%,7%

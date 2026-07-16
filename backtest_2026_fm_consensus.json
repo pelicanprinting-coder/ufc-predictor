@@ -1,0 +1,12 @@
+{
+  "total": 200,
+  "with_fm_ratings": 170,
+  "baseline_v2_pct": 60.0,
+  "v2_on_fm_avail_pct": 58.82,
+  "fm_standalone_pct": 94.12,
+  "ensemble_avg_pct": 89.41,
+  "v2_fm_agree_n": 102,
+  "v2_fm_agree_pct": 94.12,
+  "v2_fm_disagree_n": 68,
+  "v2_fm_disagree_pct": 5.88
+}

@@ -1826,7 +1826,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY"])
+tab1, tab2, tab3, tab4 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV"])
 
 # ── TAB 1 ─────────────────────────────────────────────────────────
 with tab1:
@@ -2373,3 +2373,13 @@ with tab3:
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+
+# ── TAB 4: APEX CSV ─────────────────────────────────────────────
+with tab4:
+    try:
+        from apex_predictor import render_apex_page
+        render_apex_page()
+    except Exception as e:
+        st.error(f"Apex CSV Predictor failed to load: {e}")
+        st.exception(e)

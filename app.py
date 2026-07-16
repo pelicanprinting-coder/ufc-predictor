@@ -773,7 +773,20 @@ def build_features(r, b, r_odds=None, b_odds=None):
     feats["win_rate_l5_diff"] = sd("win_rate_l5")
     feats["win_rate_l3_diff"] = sd("win_rate_l3")
 
-    return pd.DataFrame([feats])[features].fillna(0)
+    # BFO odds-movement placeholders (v5 model). Populated later in prever()
+    # when bfo_aligned_features.csv has a matching fight_key; otherwise 0.
+    for _bfo_col in (
+        "r_clv", "b_clv", "clv_diff_rb",
+        "r_movement_pct", "b_movement_pct", "movement_diff_rb",
+        "r_late", "b_late", "late_diff_rb",
+        "r_steam", "b_steam", "steam_diff_rb",
+        "r_vol", "b_vol", "vol_diff_rb",
+    ):
+        feats.setdefault(_bfo_col, 0.0)
+
+    # Reindex to the model's expected feature order. Any columns the model
+    # was trained on but that we didn't compute get filled with 0.
+    return pd.DataFrame([feats]).reindex(columns=features, fill_value=0).fillna(0)
 
 def prever(f1_name, f2_name, odds_f1=None, odds_f2=None,
            r_ko_odds=None, r_sub_odds=None, r_dec_odds=None,

@@ -1,0 +1,10 @@
+{
+  "total_pairs": 259,
+  "elo_standalone_pct": 59.07,
+  "market_open_standalone_pct": 69.5,
+  "elo_market_agree_pct": 69.07,
+  "elo_market_agree_n": 194,
+  "elo_market_disagree_elo_pct": 29.23,
+  "elo_market_disagree_market_pct": 70.77,
+  "elo_market_disagree_n": 65
+}

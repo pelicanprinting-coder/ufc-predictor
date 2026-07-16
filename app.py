@@ -1826,7 +1826,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV", "⚡  APEX V2", "🎯  LIVE ODDS & EDGE"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV", "⚡  APEX V2", "🎯  LIVE ODDS & EDGE", "📝  CARD PREP"])
 
 # ── TAB 1 ─────────────────────────────────────────────────────────
 with tab1:
@@ -2402,4 +2402,14 @@ with tab6:
         render_live_odds_page()
     except Exception as e:
         st.error(f"Live Odds tab failed to load: {e}")
+        st.exception(e)
+
+
+# ── TAB 7: CARD PREP (auto-fill APEX rows for current UFC card) ────
+with tab7:
+    try:
+        from card_prep_tab import render_card_prep_page
+        render_card_prep_page()
+    except Exception as e:
+        st.error(f"Card Prep tab failed to load: {e}")
         st.exception(e)

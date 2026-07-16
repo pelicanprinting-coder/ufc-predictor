@@ -1826,7 +1826,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV", "⚡  APEX V2"])
 
 # ── TAB 1 ─────────────────────────────────────────────────────────
 with tab1:
@@ -2382,4 +2382,14 @@ with tab4:
         render_apex_page()
     except Exception as e:
         st.error(f"Apex CSV Predictor failed to load: {e}")
+        st.exception(e)
+
+
+# ── TAB 5: APEX V2 (archetype-enhanced ensemble) ────────────────
+with tab5:
+    try:
+        from apex_predictor_v2 import render_apex_page_v2
+        render_apex_page_v2()
+    except Exception as e:
+        st.error(f"Apex V2 Predictor failed to load: {e}")
         st.exception(e)

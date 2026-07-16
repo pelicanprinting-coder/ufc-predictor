@@ -1826,7 +1826,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV", "⚡  APEX V2"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📅  UPCOMING EVENTS", "🔍  PREDICT A FIGHT", "📋  HISTORY", "🏆  APEX CSV", "⚡  APEX V2", "🎯  LIVE ODDS & EDGE"])
 
 # ── TAB 1 ─────────────────────────────────────────────────────────
 with tab1:
@@ -2392,4 +2392,14 @@ with tab5:
         render_apex_page_v2()
     except Exception as e:
         st.error(f"Apex V2 Predictor failed to load: {e}")
+        st.exception(e)
+
+
+# ── TAB 6: LIVE ODDS & EDGE (OpticOdds x V2 model) ──────────────
+with tab6:
+    try:
+        from live_odds_tab import render_live_odds_page
+        render_live_odds_page()
+    except Exception as e:
+        st.error(f"Live Odds tab failed to load: {e}")
         st.exception(e)

@@ -1,23 +1,23 @@
 name,_display_name,ufcstats_url,recent_fight_1_result,recent_fight_1_method,recent_fight_2_result,recent_fight_2_method,recent_fight_3_result,recent_fight_3_method
-Dione Barbosa,Dione Barbosa,[UFCStats](http://ufcstats.com/fighter-details/27b388f0aab49780),W,M-DEC,L,U-DEC,W,SUB
-Christian Leroy Duncan,Christian Leroy Duncan,[UFCStats](http://www.ufcstats.com/fighter-details/a93f94c923c3a9cb),W,U-DEC,W,KO/TKO,W,KO/TKO
+Dione Barbosa,Dione Barbosa,[UFCStats](http://ufcstats.com/fighter-details/27b388f0aab49780),W,MD,L,UD,W,SUB
+Christian Leroy Duncan,Christian Leroy Duncan,[UFCStats](http://www.ufcstats.com/fighter-details/a93f94c923c3a9cb),W,UD,W,TKO,W,TKO
 Anna Melisano,Anna Melisano,[UFCStats](http://ufcstats.com/fighter-details/40a7ec5d1ad6ffa8),,,,,,
-Austin Bashi,Austin Bashi,[UFCStats](http://ufcstats.com/fighter-details/d3f89fa685bd8420),W,SUB,L,U-DEC,W,SUB
-Chase Hooper,Chase Hooper,[UFCStats](http://ufcstats.com/fighter-details/971246648e162f0d),L,KO/TKO,L,KO/TKO,W,U-DEC
-Fatima Kline,Fatima Kline,[UFCStats](http://ufcstats.com/fighter-details/745fa7b605f8e2da),W,U-DEC,W,KO/TKO,W,KO/TKO
+Austin Bashi,Austin Bashi,[UFCStats](http://ufcstats.com/fighter-details/d3f89fa685bd8420),W,SUB,L,UD,W,SUB
+Chase Hooper,Chase Hooper,[UFCStats](http://ufcstats.com/fighter-details/971246648e162f0d),L,TKO,L,TKO,W,UD
+Fatima Kline,Fatima Kline,[UFCStats](http://ufcstats.com/fighter-details/745fa7b605f8e2da),W,UD,W,TKO,W,TKO
 Alberto Montes,Alberto Montes,http://ufcstats.com/fighter-details/a112097ad877a48f,W,SUB,W,SUB,,
-Felipe Franco,Felipe Franco,[UFCStats](http://ufcstats.com/fighter-details/e564146b9cf6dbef),L,U-DEC,L,SUB,,
-Dricus Du Plessis,Dricus Du Plessis,[UFCStats](http://ufcstats.com/fighter-details/0d7b51c9d2649a6e),L,U-DEC,W,U-DEC,W,SUB
-Jose Delgado,Jose Delgado,http://ufcstats.com/fighter-details/7d6ceff6747f2de2,W,S-DEC,L,U-DEC,W,KO/TKO
-Kamaru Usman,Kamaru Usman,[UFCStats](http://ufcstats.com/fighter-details/f1b2aa7853d1ed6e),W,U-DEC,L,M-DEC,L,M-DEC
-Jared Cannonier,Jared Cannonier,[UFCStats](http://ufcstats.com/fighter-details/13a0275fa13c4d26),L,U-DEC,W,KO/TKO,L,U-DEC
-Jean-Paul Lebosnoyani,Jean-Paul Lebosnoyani,http://ufcstats.com/fighter-details/a3dda21be645be93,W,S-DEC,W,KO/TKO,,
+Felipe Franco,Felipe Franco,[UFCStats](http://ufcstats.com/fighter-details/e564146b9cf6dbef),L,SUB,,,,
+Dricus Du Plessis,Dricus Du Plessis,[UFCStats](http://ufcstats.com/fighter-details/0d7b51c9d2649a6e),L,UD,W,UD,W,SUB
+Jose Delgado,Jose Delgado,http://ufcstats.com/fighter-details/7d6ceff6747f2de2,W,SD,L,UD,W,TKO
+Kamaru Usman,Kamaru Usman,[UFCStats](http://ufcstats.com/fighter-details/f1b2aa7853d1ed6e),W,UD,L,MD,L,MD
+Jared Cannonier,Jared Cannonier,[UFCStats](http://ufcstats.com/fighter-details/13a0275fa13c4d26),L,UD,W,TKO,L,UD
+Jean-Paul Lebosnoyani,Jean-Paul Lebosnoyani,http://ufcstats.com/fighter-details/a3dda21be645be93,W,SD,W,TKO,,
 RJ Harris,RJ Harris,[UFCStats](http://ufcstats.com/fighter-details/e03187ec8b5b6abc),,,,,,
-Alden Coria,Alden Coria,[UFCStats](http://ufcstats.com/fighter-details/5e9ca8dd7d783a75),W,U-DEC,W,KO/TKO,,
-Mitch Ramirez,Mitch Ramirez,http://ufcstats.com/fighter-details/e99eb0ef25885de5,L,KO/TKO,L,KO/TKO,L,KO/TKO
-Levi Rodrigues Jr.,Levi Rodrigues Jr.,[UFCStats](http://ufcstats.com/fighter-details/9ac4e43ed56429ed),NC,KO/TKO,,,,
-Seokhyeon Ko,Seokhyeon Ko,[Seokhyeon Ko's UFCStats Profile](http://ufcstats.com/fighter-details/4a07b1988477502c),W,U-DEC,W,U-DEC,W,U-DEC
-Stewart Nicoll,Stewart Nicoll,[UFCStats Profile](http://ufcstats.com/fighter-details/2bd98ab77a8daa75),L,KO/TKO,L,U-DEC,L,SUB
-Alvin Hines,Alvin Hines,[ufcstats.com](http://ufcstats.com/fighter-details/ab2a4b5e04dc5fe9),L,U-DEC,,,,
-Tabatha Ricci,Tabatha Ricci,[UFC Stats](http://ufcstats.com/fighter-details/d25240135aee03e5),L,U-DEC,W,KO/TKO,L,U-DEC
-Tommy McMillen,Tommy McMillen,http://ufcstats.com/fighter-details/6b0a6def604de298,W,KO/TKO,W,M-DEC,,
+Alden Coria,Alden Coria,[UFCStats](http://ufcstats.com/fighter-details/5e9ca8dd7d783a75),W,UD,W,TKO,,
+Mitch Ramirez,Mitch Ramirez,http://ufcstats.com/fighter-details/e99eb0ef25885de5,L,TKO,L,TKO,L,TKO
+Levi Rodrigues Jr.,Levi Rodrigues Jr.,[UFCStats](http://ufcstats.com/fighter-details/9ac4e43ed56429ed),NC,TKO,,,,
+Seokhyeon Ko,Seokhyeon Ko,[Seokhyeon Ko's UFCStats Profile](http://ufcstats.com/fighter-details/4a07b1988477502c),W,UD,W,UD,W,UD
+Stewart Nicoll,Stewart Nicoll,[UFCStats Profile](http://ufcstats.com/fighter-details/2bd98ab77a8daa75),L,TKO,L,UD,L,SUB
+Alvin Hines,Alvin Hines,[ufcstats.com](http://ufcstats.com/fighter-details/ab2a4b5e04dc5fe9),L,UD,,,,
+Tabatha Ricci,Tabatha Ricci,[UFC Stats](http://ufcstats.com/fighter-details/d25240135aee03e5),L,UD,W,TKO,L,UD
+Tommy McMillen,Tommy McMillen,http://ufcstats.com/fighter-details/6b0a6def604de298,W,TKO,W,MD,,

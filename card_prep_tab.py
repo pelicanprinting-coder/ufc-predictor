@@ -202,6 +202,48 @@ def _american(v) -> str | None:
         return None
 
 
+def _fmt_num(v, max_decimals: int = 2):
+    """Format a number with up to `max_decimals` decimal places, trimming
+    trailing zeros. Whole values return without a decimal point.
+
+    Examples:
+        9.00  -> "9"
+        1.50  -> "1.5"
+        2.364 -> "2.36"
+        0     -> "0"
+    Non-numeric or missing values pass through unchanged.
+    """
+    if v is None:
+        return None
+    if isinstance(v, float) and np.isnan(v):
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        # Percent- or American-odds strings are already formatted — leave them
+        if v.endswith("%") or v.startswith("+") or (v.startswith("-") and
+                                                      v[1:].isdigit()):
+            return v
+        # Try to parse numeric-looking strings, otherwise leave alone
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return v
+    else:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return v
+    if np.isnan(f):
+        return None
+    # Round to max_decimals, then strip trailing zeros
+    rounded = round(f, max_decimals)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    # Use format string and strip trailing zeros / dot
+    return f"{rounded:.{max_decimals}f}".rstrip("0").rstrip(".")
+
+
 # --- Row builder ------------------------------------------------------
 
 def build_row(
@@ -572,6 +614,22 @@ def render_card_prep_page():
         not_found = [n for n, missing in missing_by_fighter.items() if missing]
         c3.metric("Not in Latshaw", len(not_found),
                   help=", ".join(not_found) if not_found else "All matched")
+
+        # Trim trailing decimals: 9.00 -> 9, 1.50 -> 1.5, 2.364 -> 2.36.
+        # Skip result/method columns (already strings) and Event/pair labels.
+        _skip_fmt = {
+            "Event", "fight_pair", "FIGHTER", "opponent_name", "weight_class",
+            "stance", "pro_record", "ufc_record",
+            "recent_fight_1_result", "recent_fight_1_method",
+            "recent_fight_2_result", "recent_fight_2_method",
+            "recent_fight_3_result", "recent_fight_3_method",
+            "OPEN", "CURRENT",
+            "ml_win_by_ko", "ml_win_by_sub", "ml_win_by_dec",
+        }
+        for c in df.columns:
+            if c in _skip_fmt:
+                continue
+            df[c] = df[c].map(_fmt_num)
 
         # Yellow-highlight ONLY the columns explicitly marked "Manually Loaded"
         # in docs/apex_column_mapping.csv — not every missing value.
